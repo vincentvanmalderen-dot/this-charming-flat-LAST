@@ -133,10 +133,13 @@ const C = {
 };
 
 const DEFAULT_PRICING = {
-  low:  { label: "Low season",  months: "Nov · Dec · Jan · Feb", note: "Terrace quiet — except Christmas/NYE at peak rates", airbnb: [110,100,90,80],  direct: [80,72,68,64] },
-  mid:  { label: "Mid season",  months: "Mar · Apr · May · Sep · Oct", note: "Terrace pleasant, solid demand — Sep can flex to peak", airbnb: [135,125,115,105], direct: [100,90,85,80] },
-  peak: { label: "Peak summer", months: "Jun · Jul · Aug", note: "Terrace at its best — Notting Hill Carnival, Pride & Arsenal fixtures", airbnb: [165,155,145,135], direct: [120,110,105,100] },
+  low:  { label: "Low season",  months: "Nov · Dec · Jan · Feb", note: "Terrace quiet — except Christmas/NYE at peak rates", airbnb: [118,118,118,106],  direct: [80,72,68,64] },
+  mid:  { label: "Mid season",  months: "Mar · Apr · May · Sep · Oct", note: "Terrace pleasant, solid demand — Sep can flex to peak", airbnb: [118,118,118,106], direct: [100,90,85,80] },
+  peak: { label: "Peak summer", months: "Jun · Jul · Aug", note: "Terrace at its best — Notting Hill Carnival, Pride & Arsenal fixtures", airbnb: [118,118,118,106], direct: [120,110,105,100] },
 };
+
+// Airbnb real pricing (flat year-round, shown only in backoffice)
+const AIRBNB_PRICING = { weeknight: 118, weekend: 145, weeklyDiscount: 10 };
 
 const NIGHT_LABELS = ["1 night","3 nights","5 nights","7 nights"];
 const NIGHT_COUNTS = [1,3,5,7];
@@ -1039,7 +1042,7 @@ function AdminTextBlocks({ textBlocks, setTextBlocks, flashSave }) {
 
 function AdminGuestbook({ entries, setEntries, flashSave }) {
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", date: new Date().toISOString().slice(0,10), story: "", nights: "" });
+  const [form, setForm] = useState({ name: "", date: new Date().toISOString().slice(0,10), story: "", nights: "", source: "tcf", rating: 5 });
 
   async function addEntry() {
     if (!form.name || !form.story) return;
@@ -1047,7 +1050,7 @@ function AdminGuestbook({ entries, setEntries, flashSave }) {
     setEntries(next);
     await sb.setSetting("guestbook", next);
     setShowAdd(false);
-    setForm({ name: "", date: new Date().toISOString().slice(0,10), story: "", nights: "" });
+    setForm({ name: "", date: new Date().toISOString().slice(0,10), story: "", nights: "", source: "tcf", rating: 5 });
     flashSave("Guestbook entry added ✓");
   }
 
@@ -1058,21 +1061,65 @@ function AdminGuestbook({ entries, setEntries, flashSave }) {
     flashSave("Entry removed ✓");
   }
 
+  const airbnbEntries = (entries||[]).filter(e => e.source === "airbnb");
+  const avgRating = airbnbEntries.length > 0
+    ? (airbnbEntries.reduce((s,e) => s + Number(e.rating||5), 0) / airbnbEntries.length).toFixed(2)
+    : null;
+
   return (
     <div className="slide-in">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px",flexWrap:"wrap",gap:"12px"}}>
         <div>
           <h2 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",fontSize:"1.3rem"}}>Guestbook</h2>
-          <p style={{fontSize:"0.85rem",color:C.onSurfaceVariant,marginTop:"4px"}}>Add guest stories — they appear on the public Guestbook tab.</p>
+          <p style={{fontSize:"0.85rem",color:C.onSurfaceVariant,marginTop:"4px"}}>Add guest stories — they appear on the public Guestbook page. Mark the source as TCF direct or Airbnb.</p>
         </div>
         <button onClick={()=>setShowAdd(s=>!s)} className="btn-primary" style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"0.85rem"}}>
           <Icon name="add" size={16}/>Add entry
         </button>
       </div>
 
+      {avgRating&&(
+        <div style={{background:"#fff8f0",border:"1px solid #ffe0c0",borderRadius:"10px",padding:"14px 18px",marginBottom:"16px",display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
+          <span style={{fontSize:"0.85rem",fontWeight:"700",color:"#b06000"}}>Airbnb average rating:</span>
+          <span style={{display:"flex",gap:"2px"}}>
+            {[1,2,3,4,5].map(n=>(
+              <span key={n} style={{color:n<=Math.round(avgRating)?"#ff9500":"#ddd",fontSize:"1.1rem"}}>★</span>
+            ))}
+          </span>
+          <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"800",fontSize:"1.1rem",color:"#b06000"}}>{avgRating}</span>
+          <span style={{fontSize:"0.8rem",color:C.onSurfaceVariant}}>from {airbnbEntries.length} Airbnb review{airbnbEntries.length!==1?"s":""}</span>
+        </div>
+      )}
+
       {showAdd&&(
         <div className="card" style={{padding:"24px",marginBottom:"20px"}}>
           <h3 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",fontSize:"1rem",marginBottom:"16px"}}>New guestbook entry</h3>
+          <div style={{marginBottom:"14px"}}>
+            <label style={{display:"block",fontSize:"0.72rem",fontWeight:"700",color:C.onSurfaceVariant,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"6px"}}>Source</label>
+            <div style={{display:"flex",gap:"8px"}}>
+              <button onClick={()=>setForm(f=>({...f,source:"tcf"}))}
+                style={{flex:1,padding:"10px",borderRadius:"8px",border:form.source==="tcf"?`2px solid ${C.primary}`:`1px solid ${C.outlineVariant}`,
+                  background:form.source==="tcf"?C.primaryFixed:"white",fontWeight:"700",fontSize:"0.85rem",cursor:"pointer",color:form.source==="tcf"?C.primary:C.onSurfaceVariant}}>
+                This Charming Flat (direct)
+              </button>
+              <button onClick={()=>setForm(f=>({...f,source:"airbnb"}))}
+                style={{flex:1,padding:"10px",borderRadius:"8px",border:form.source==="airbnb"?"2px solid #d85a30":`1px solid ${C.outlineVariant}`,
+                  background:form.source==="airbnb"?"#fef0e8":"white",fontWeight:"700",fontSize:"0.85rem",cursor:"pointer",color:form.source==="airbnb"?"#d85a30":C.onSurfaceVariant}}>
+                Airbnb
+              </button>
+            </div>
+          </div>
+          {form.source==="airbnb"&&(
+            <div style={{marginBottom:"14px"}}>
+              <label style={{display:"block",fontSize:"0.72rem",fontWeight:"700",color:C.onSurfaceVariant,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"6px"}}>Star rating</label>
+              <div style={{display:"flex",gap:"4px"}}>
+                {[1,2,3,4,5].map(n=>(
+                  <button key={n} onClick={()=>setForm(f=>({...f,rating:n}))}
+                    style={{background:"none",border:"none",cursor:"pointer",fontSize:"1.6rem",color:n<=form.rating?"#ff9500":"#ddd",padding:0}}>★</button>
+                ))}
+              </div>
+            </div>
+          )}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px"}}>
             <div>
               <label style={{display:"block",fontSize:"0.72rem",fontWeight:"700",color:C.onSurfaceVariant,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"4px"}}>Guest name</label>
@@ -1102,13 +1149,24 @@ function AdminGuestbook({ entries, setEntries, flashSave }) {
       {(!entries||entries.length===0)
         ? <div className="card" style={{padding:"32px",textAlign:"center",color:C.onSurfaceVariant}}>No entries yet. Add your first guest story!</div>
         : [...(entries||[])].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(e=>(
-          <div key={e.id} className="card" style={{padding:"20px",marginBottom:"12px"}}>
+          <div key={e.id} className="card" style={{padding:"20px",marginBottom:"12px",borderLeft:e.source==="airbnb"?"4px solid #d85a30":`4px solid ${C.primary}`}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"12px"}}>
               <div style={{flex:1}}>
                 <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"8px",flexWrap:"wrap"}}>
                   <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",fontSize:"1rem"}}>{e.name}</span>
+                  <span style={{fontSize:"0.7rem",padding:"2px 8px",borderRadius:"999px",fontWeight:"700",
+                    background:e.source==="airbnb"?"#fef0e8":C.primaryFixed,color:e.source==="airbnb"?"#d85a30":C.primary}}>
+                    {e.source==="airbnb"?"Airbnb":"TCF direct"}
+                  </span>
+                  {e.source==="airbnb"&&e.rating&&(
+                    <span style={{display:"flex",gap:"1px"}}>
+                      {[1,2,3,4,5].map(n=>(
+                        <span key={n} style={{color:n<=e.rating?"#ff9500":"#ddd",fontSize:"0.9rem"}}>★</span>
+                      ))}
+                    </span>
+                  )}
                   <span style={{fontSize:"0.78rem",color:C.onSurfaceVariant}}>{formatDate(e.date)}</span>
-                  {e.nights&&<span style={{fontSize:"0.72rem",background:C.primaryFixed,color:C.onPrimaryFixed,padding:"2px 8px",borderRadius:"999px",fontWeight:"700"}}>{e.nights} nights</span>}
+                  {e.nights&&<span style={{fontSize:"0.72rem",background:C.surfaceContainerLow,color:C.onSurfaceVariant,padding:"2px 8px",borderRadius:"999px",fontWeight:"700"}}>{e.nights} nights</span>}
                 </div>
                 <p style={{color:C.onSurfaceVariant,lineHeight:"1.7",fontSize:"0.88rem",whiteSpace:"pre-wrap"}}>{e.story}</p>
               </div>
@@ -1121,12 +1179,19 @@ function AdminGuestbook({ entries, setEntries, flashSave }) {
   );
 }
 
+
 // ─── GUEST: GUESTBOOK ────────────────────────────────────────────────────────
 
 function GuestGuestbook({ entries }) {
+  const all = entries || [];
+  const airbnbEntries = all.filter(e => e.source === "airbnb");
+  const avgRating = airbnbEntries.length > 0
+    ? (airbnbEntries.reduce((s,e) => s + Number(e.rating||5), 0) / airbnbEntries.length).toFixed(2)
+    : null;
+
   return (
     <div className="fade-in" style={{padding:"120px clamp(20px,5vw,48px) 80px",maxWidth:"860px",margin:"0 auto"}}>
-      <div style={{marginBottom:"48px"}}>
+      <div style={{marginBottom:"40px"}}>
         <span style={{display:"inline-flex",alignItems:"center",gap:"8px",background:C.primaryFixed,color:C.onPrimaryFixed,padding:"4px 16px",borderRadius:"999px",fontSize:"0.72rem",fontWeight:"800",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"16px"}}>
           <span style={{width:"8px",height:"8px",borderRadius:"50%",background:C.primary}}/>
           Guestbook
@@ -1135,21 +1200,56 @@ function GuestGuestbook({ entries }) {
         <p style={{color:C.onSurfaceVariant,fontSize:"1rem",lineHeight:"1.7",maxWidth:"560px"}}>Real stories from people who've stayed at This Charming Flat.</p>
       </div>
 
-      {(!entries||entries.length===0)
+      {avgRating&&(
+        <div style={{background:"linear-gradient(135deg,#ff9500,#ff7a00)",borderRadius:"16px",padding:"24px 28px",marginBottom:"32px",color:"white",display:"flex",alignItems:"center",gap:"20px",flexWrap:"wrap"}}>
+          <div>
+            <div style={{fontSize:"0.75rem",fontWeight:"700",textTransform:"uppercase",letterSpacing:"0.08em",opacity:0.9,marginBottom:"4px"}}>Our Airbnb rating</div>
+            <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
+              <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"800",fontSize:"2.4rem",lineHeight:1}}>{avgRating}</span>
+              <div>
+                <div style={{display:"flex",gap:"2px"}}>
+                  {[1,2,3,4,5].map(n=>(
+                    <span key={n} style={{color:n<=Math.round(avgRating)?"white":"rgba(255,255,255,0.4)",fontSize:"1.2rem"}}>★</span>
+                  ))}
+                </div>
+                <div style={{fontSize:"0.8rem",opacity:0.9,marginTop:"2px"}}>from {airbnbEntries.length} Airbnb review{airbnbEntries.length!==1?"s":""}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {all.length===0
         ? <div style={{textAlign:"center",color:C.onSurfaceVariant,padding:"60px 0",fontSize:"1rem"}}>
             <div style={{fontSize:"2rem",marginBottom:"16px"}}>📖</div>
             <p>No guest stories yet — check back soon!</p>
           </div>
-        : [...(entries||[])].sort((a,b)=>new Date(b.date)-new Date(a.date)).map((e,i)=>(
+        : [...all].sort((a,b)=>new Date(b.date)-new Date(a.date)).map((e,i)=>{
+          const isAirbnb = e.source === "airbnb";
+          const accent = isAirbnb ? "#d85a30" : C.primary;
+          return (
           <div key={e.id} style={{
             background:C.surfaceContainerLowest,borderRadius:"16px",
             padding:"clamp(24px,4vw,40px)",marginBottom:"20px",
-            borderLeft:`4px solid ${C.primary}`,position:"relative"
+            borderLeft:`4px solid ${accent}`,position:"relative"
           }}>
-            <div style={{fontSize:"3rem",color:C.primaryFixed,position:"absolute",top:"16px",right:"24px",lineHeight:1,fontFamily:"Georgia,serif",opacity:0.4}}>"</div>
+            <div style={{fontSize:"3rem",color:isAirbnb?"#f5d5c5":C.primaryFixed,position:"absolute",top:"16px",right:"24px",lineHeight:1,fontFamily:"Georgia,serif",opacity:0.5}}>"</div>
+            <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"14px",flexWrap:"wrap"}}>
+              <span style={{fontSize:"0.68rem",padding:"3px 10px",borderRadius:"999px",fontWeight:"800",letterSpacing:"0.05em",textTransform:"uppercase",
+                background:isAirbnb?"#fef0e8":C.primaryFixed,color:accent}}>
+                {isAirbnb?"via Airbnb":"Direct guest"}
+              </span>
+              {isAirbnb&&e.rating&&(
+                <span style={{display:"flex",gap:"1px"}}>
+                  {[1,2,3,4,5].map(n=>(
+                    <span key={n} style={{color:n<=e.rating?"#ff9500":"#ddd",fontSize:"1rem"}}>★</span>
+                  ))}
+                </span>
+              )}
+            </div>
             <p style={{fontSize:"1rem",lineHeight:"1.8",color:C.onSurface,whiteSpace:"pre-wrap",marginBottom:"20px",fontStyle:"italic"}}>{e.story}</p>
             <div style={{display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
-              <div style={{width:"36px",height:"36px",borderRadius:"50%",background:`linear-gradient(135deg,${C.primary},${C.secondary})`,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontWeight:"800",fontSize:"0.9rem",flexShrink:0}}>
+              <div style={{width:"36px",height:"36px",borderRadius:"50%",background:`linear-gradient(135deg,${accent},${isAirbnb?"#ff9500":C.secondary})`,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontWeight:"800",fontSize:"0.9rem",flexShrink:0}}>
                 {e.name.charAt(0).toUpperCase()}
               </div>
               <div>
@@ -1160,12 +1260,12 @@ function GuestGuestbook({ entries }) {
               </div>
             </div>
           </div>
-        ))
+          );
+        })
       }
     </div>
   );
 }
-
 // ─── GUEST: PRIVACY PAGE ─────────────────────────────────────────────────────
 
 function GuestPrivacy({ info }) {
@@ -1501,6 +1601,13 @@ function AdminRequests({ requests, setRequests, blockedDates, setBlockedDates, f
     flashSave(newPaid?"Marked as paid ✓":"Marked as unpaid");
   }
 
+  async function toggleTransferred(r){
+    const newVal=!r.transferred;
+    await sb.updateRequest(r.id,r.status,{transferred:newVal});
+    setRequests(prev=>prev.map(req=>req.id===r.id?{...req,transferred:newVal}:req));
+    flashSave(newVal?"Marked as transferred to Elina ✓":"Marked as not transferred");
+  }
+
   async function updateAmount(r,amount){
     await sb.updateRequest(r.id,r.status,{total:Number(amount)});
     setRequests(prev=>prev.map(req=>req.id===r.id?{...req,total:Number(amount)}:req));
@@ -1513,6 +1620,21 @@ function AdminRequests({ requests, setRequests, blockedDates, setBlockedDates, f
   }
 
   const filtered=requests.filter(r=>filter==="all"||r.status===filter);
+
+  // ── Booking calculators ──────────────────────────────────────────────
+  const calcYear = new Date().getFullYear();
+  function nightsBetween(ci, co){
+    if(!ci||!co) return 0;
+    return Math.max(0, Math.round((new Date(co)-new Date(ci))/86400000));
+  }
+  // All confirmed bookings that fall in the current year
+  const confirmedThisYear = requests.filter(r => r.status==="confirmed" && new Date(r.check_in).getFullYear()===calcYear);
+  const totalNightsBooked = confirmedThisYear.reduce((s,r)=>s+nightsBetween(r.check_in,r.check_out),0);
+  // Airbnb bookings = relationship field contains "airbnb"
+  const airbnbThisYear = confirmedThisYear.filter(r => (r.relationship||"").toLowerCase().includes("airbnb"));
+  const airbnbNights = airbnbThisYear.reduce((s,r)=>s+nightsBetween(r.check_in,r.check_out),0);
+  const AIRBNB_CAP = 90;
+  const airbnbRemaining = Math.max(0, AIRBNB_CAP - airbnbNights);
 
   async function sendEmail() {
     if (!emailModal) return;
@@ -1624,6 +1746,28 @@ function AdminRequests({ requests, setRequests, blockedDates, setBlockedDates, f
           ))}
         </div>
       </div>
+
+      {/* Booking calculators */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"12px",marginBottom:"24px"}}>
+        <div style={{background:`linear-gradient(135deg,${C.secondary},${C.primary})`,borderRadius:"12px",padding:"20px",color:"white"}}>
+          <div style={{fontSize:"0.72rem",fontWeight:"700",opacity:0.85,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>Nights booked in {calcYear}</div>
+          <div style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"800",fontSize:"2.2rem",lineHeight:1}}>{totalNightsBooked}</div>
+          <div style={{fontSize:"0.78rem",opacity:0.85,marginTop:"6px"}}>{confirmedThisYear.length} confirmed booking{confirmedThisYear.length!==1?"s":""} (all sources)</div>
+        </div>
+        <div style={{background:"linear-gradient(135deg,#d85a30,#ff9500)",borderRadius:"12px",padding:"20px",color:"white"}}>
+          <div style={{fontSize:"0.72rem",fontWeight:"700",opacity:0.9,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}}>Airbnb 90-night cap</div>
+          <div style={{display:"flex",alignItems:"baseline",gap:"8px"}}>
+            <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"800",fontSize:"2.2rem",lineHeight:1}}>{airbnbRemaining}</span>
+            <span style={{fontSize:"0.9rem",opacity:0.9}}>nights left</span>
+          </div>
+          <div style={{fontSize:"0.78rem",opacity:0.9,marginTop:"6px"}}>{airbnbNights} of {AIRBNB_CAP} used · {airbnbThisYear.length} Airbnb stay{airbnbThisYear.length!==1?"s":""}</div>
+          {/* Progress bar */}
+          <div style={{marginTop:"10px",height:"6px",background:"rgba(255,255,255,0.3)",borderRadius:"999px",overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${Math.min(100,(airbnbNights/AIRBNB_CAP)*100)}%`,background:"white",borderRadius:"999px"}}/>
+          </div>
+        </div>
+      </div>
+
       {filtered.length===0?<div className="card" style={{padding:"48px",textAlign:"center",color:C.onSurfaceVariant}}>No {filter==="all"?"":filter} requests.</div>:
         filtered.sort((a,b)=>new Date(b.submitted_at)-new Date(a.submitted_at)).map(r=>(
           <div key={r.id} className="card" style={{padding:"24px",marginBottom:"12px",borderLeft:`4px solid ${r.status==="confirmed"?"#2a8a2a":r.status==="declined"?C.error:C.secondary}`}}>
@@ -1670,6 +1814,13 @@ function AdminRequests({ requests, setRequests, blockedDates, setBlockedDates, f
                     background:r.paid?"#e8f5e8":"#f5f5f5",color:r.paid?"#1a6a1a":C.onSurfaceVariant}}>
                   <Icon name={r.paid?"check_circle":"radio_button_unchecked"} size={15} fill={r.paid?1:0}/>
                   {r.paid?"Paid":"Mark as paid"}
+                </button>
+                {/* Transferred to Elina toggle */}
+                <button onClick={()=>toggleTransferred(r)}
+                  style={{display:"flex",alignItems:"center",gap:"5px",padding:"5px 12px",borderRadius:"6px",border:"none",fontWeight:"700",fontSize:"0.8rem",cursor:"pointer",
+                    background:r.transferred?"#e8f0fc":"#f5f5f5",color:r.transferred?"#185fa5":C.onSurfaceVariant}}>
+                  <Icon name={r.transferred?"check_circle":"radio_button_unchecked"} size={15} fill={r.transferred?1:0}/>
+                  {r.transferred?"Transferred to Elina":"Transfer to Elina"}
                 </button>
                 {/* Send email */}
                 <button onClick={()=>{setEmailModal(r);setEmailAmount(r.total?.toString()||"");}}
@@ -1801,6 +1952,27 @@ function AdminPricing({ pricing, setPricing, showPricing, setShowPricing, flashS
           <button className="btn-primary" onClick={save} style={{padding:"8px 20px",fontSize:"0.85rem"}}>Save</button>
         </div>
       </div>
+      {/* Airbnb pricing reference card */}
+      <div className="card" style={{padding:"24px",marginBottom:"16px",background:"#fef5f0",border:"1px solid #f5d5c5"}}>
+        <h3 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",fontSize:"1rem",marginBottom:"6px",color:"#d85a30"}}>Airbnb pricing (reference)</h3>
+        <p style={{fontSize:"0.8rem",color:C.onSurfaceVariant,marginBottom:"16px"}}>These are your current live Airbnb rates. For reference only — not shown to guests on this site.</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"12px"}}>
+          <div style={{background:"white",borderRadius:"10px",padding:"16px",textAlign:"center",border:"1px solid #f0e0d5"}}>
+            <div style={{fontSize:"0.7rem",fontWeight:"700",color:C.onSurfaceVariant,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"6px"}}>Per night</div>
+            <div style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"800",fontSize:"1.6rem",color:"#d85a30"}}>£118</div>
+          </div>
+          <div style={{background:"white",borderRadius:"10px",padding:"16px",textAlign:"center",border:"1px solid #f0e0d5"}}>
+            <div style={{fontSize:"0.7rem",fontWeight:"700",color:C.onSurfaceVariant,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"6px"}}>Weekend price</div>
+            <div style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"800",fontSize:"1.6rem",color:"#d85a30"}}>£145</div>
+          </div>
+          <div style={{background:"white",borderRadius:"10px",padding:"16px",textAlign:"center",border:"1px solid #f0e0d5"}}>
+            <div style={{fontSize:"0.7rem",fontWeight:"700",color:C.onSurfaceVariant,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"6px"}}>Weekly discount</div>
+            <div style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"800",fontSize:"1.6rem",color:"#d85a30"}}>10%</div>
+          </div>
+        </div>
+      </div>
+
+      <h3 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",fontSize:"1rem",margin:"24px 0 12px"}}>Direct booking rates (shown to guests)</h3>
       {Object.entries(edit).map(([sKey,season])=>(
         <div key={sKey} className="card" style={{padding:"24px",marginBottom:"16px"}}>
           <h3 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",fontSize:"1rem",marginBottom:"16px",color:sKey==="peak"?C.primary:sKey==="mid"?"#2a5a2a":"#5a4a30"}}>{season.label}</h3>
@@ -1808,9 +1980,6 @@ function AdminPricing({ pricing, setPricing, showPricing, setShowPricing, flashS
             {NIGHT_LABELS.map((label,i)=>(
               <div key={i}>
                 <div style={{fontSize:"0.72rem",fontWeight:"700",color:C.onSurfaceVariant,marginBottom:"8px"}}>{label}</div>
-                <label style={{fontSize:"0.7rem",color:C.onSurfaceVariant,display:"block",marginBottom:"3px"}}>Airbnb £</label>
-                <input type="number" value={edit[sKey].airbnb[i]} className="input-field" style={{marginBottom:"6px",fontSize:"0.85rem"}}
-                  onChange={e=>{const v=[...edit[sKey].airbnb];v[i]=Number(e.target.value);setEdit(p=>({...p,[sKey]:{...p[sKey],airbnb:v}}));}}/>
                 <label style={{fontSize:"0.7rem",color:C.onSurfaceVariant,display:"block",marginBottom:"3px"}}>Direct £</label>
                 <input type="number" value={edit[sKey].direct[i]} className="input-field" style={{fontSize:"0.85rem"}}
                   onChange={e=>{const v=[...edit[sKey].direct];v[i]=Number(e.target.value);setEdit(p=>({...p,[sKey]:{...p[sKey],direct:v}}));}}/>
@@ -2139,13 +2308,13 @@ function AdminAnalytics({ requests, airbnbBookings, costs, setCosts, flashSave }
               <div key={m.month} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:"2px"}}>
                 <div style={{width:"100%",display:"flex",gap:"2px",alignItems:"flex-end",height:"140px"}}>
                   {(view==="revenue"||view==="combined")&&(
-                    <div style={{flex:1,height:`${revH}px`,minHeight:m.revenue>0?4:0,background:isCur?C.primary:C.secondary,borderRadius:"3px 3px 0 0",transition:"height 0.3s"}}/>
+                    <div style={{flex:1,height:`${revH}px`,minHeight:m.revenue>0?4:0,background:C.secondary,opacity:isCur?1:0.75,borderRadius:"3px 3px 0 0",transition:"height 0.3s"}}/>
                   )}
                   {(view==="costs"||view==="combined")&&(
                     <div style={{flex:1,height:`${costH}px`,minHeight:m.totalCosts>0?4:0,background:"#ffc107",borderRadius:"3px 3px 0 0",transition:"height 0.3s"}}/>
                   )}
                 </div>
-                <div style={{fontSize:"0.62rem",color:isCur?C.primary:C.onSurfaceVariant,fontWeight:isCur?"700":"400"}}>{m.month}</div>
+                <div style={{fontSize:"0.62rem",color:isCur?C.secondary:C.onSurfaceVariant,fontWeight:isCur?"700":"400"}}>{m.month}</div>
               </div>
             );
           })}
