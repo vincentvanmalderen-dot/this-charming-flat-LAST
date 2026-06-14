@@ -230,15 +230,17 @@ const globalCSS = `
   @keyframes slideIn { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:translateX(0)} }
   .fade-in { animation:fadeIn 0.4s ease; }
   @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  /* Admin sidebar: visible on desktop, slide-in drawer on mobile */
+  .admin-sidebar { transform: translateX(0); }
+  .admin-menu-btn { display: none; }
   @media(max-width:768px){
     .desktop-only{display:none!important;}
-    .mobile-sidebar{transform:translateX(-100%)!important;}
-    .mobile-sidebar.open{transform:translateX(0)!important;}
   }
   @media(max-width:900px){
-    main[style*="margin-left:256px"], main[style*="marginLeft"] { margin-left:0!important; padding-top:72px!important; }
-    aside[style*="position:fixed"] { transform:translateX(-100%); transition:transform 0.3s; }
-    aside[style*="position:fixed"].sidebar-open { transform:translateX(0); }
+    .admin-sidebar { transform: translateX(-100%); }
+    .admin-sidebar.open { transform: translateX(0); box-shadow: 0 0 40px rgba(0,0,0,0.25); }
+    .admin-main { margin-left: 0 !important; padding-top: 72px !important; }
+    .admin-menu-btn { display: inline-flex !important; }
   }
   @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
 `;
@@ -1392,12 +1394,11 @@ function AdminSidebar({ activeTab, setTab, pendingCount, sidebarOpen, setSidebar
     <>
       {/* Overlay for mobile */}
       {sidebarOpen&&<div onClick={()=>setSidebarOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.3)",zIndex:39}}/>}
-      <aside style={{
+      <aside className={`admin-sidebar${sidebarOpen?" open":""}`} style={{
         position:"fixed",left:0,top:0,height:"100vh",width:"256px",
         background:C.surfaceContainer,display:"flex",flexDirection:"column",
         paddingTop:"24px",paddingBottom:"24px",zIndex:40,overflowY:"auto",
         transition:"transform 0.3s",
-        transform: window.innerWidth<=768 && !sidebarOpen ? "translateX(-100%)" : "translateX(0)",
       }}>
         {/* Header */}
         <div style={{padding:"0 24px 32px"}}>
@@ -2631,16 +2632,16 @@ function AdminView({ blockedDates, setBlockedDates, ownerDates, setOwnerDates, p
   return (
     <div style={{background:C.surface,minHeight:"100vh"}}>
       <AdminSidebar activeTab={tab} setTab={setTab} pendingCount={pending} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}/>
-      <main style={{marginLeft:"256px",padding:"clamp(16px,4vw,48px)",minHeight:"100vh",transition:"margin 0.3s"}}>
+      <main className="admin-main" style={{marginLeft:"256px",padding:"clamp(16px,4vw,48px)",minHeight:"100vh",transition:"margin 0.3s"}}>
         {/* Top bar */}
-        <header style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"48px"}}>
+        <header style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"clamp(24px,4vw,48px)",flexWrap:"wrap",gap:"16px"}}>
           <div>
             <h1 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:"clamp(2rem,4vw,3rem)",fontWeight:"800",letterSpacing:"-0.02em",marginBottom:"4px"}}>This Charming Flat</h1>
             <p style={{color:C.onSurfaceVariant,fontSize:"0.9rem"}}>Managing your Islington sanctuary.</p>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
             {saved&&<span style={{background:"#e8f5e8",color:"#1a5a1a",padding:"4px 14px",borderRadius:"999px",fontSize:"0.8rem",fontWeight:"700"}}>{saved}</span>}
-            <div style={{background:C.surfaceContainerLow,padding:"4px 4px 4px 16px",borderRadius:"999px",display:"flex",alignItems:"center",gap:"12px"}}>
+            <div className="desktop-only" style={{background:C.surfaceContainerLow,padding:"4px 4px 4px 16px",borderRadius:"999px",display:"flex",alignItems:"center",gap:"12px"}}>
               <div>
                 <div style={{fontSize:"0.65rem",textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:"700",opacity:0.5}}>Hosting</div>
                 <div style={{fontSize:"0.85rem",fontWeight:"700",color:C.secondary}}>Elina & Vincent</div>
@@ -2651,7 +2652,7 @@ function AdminView({ blockedDates, setBlockedDates, ownerDates, setOwnerDates, p
             </div>
             <button onClick={onLogout} style={{background:"transparent",border:`1px solid rgba(230,189,183,0.4)`,color:C.onSurfaceVariant,borderRadius:"999px",padding:"6px 14px",fontSize:"0.82rem",fontWeight:"500",cursor:"pointer"}}>Log out</button>
             {/* Mobile hamburger */}
-            <button onClick={()=>setSidebarOpen(o=>!o)} style={{background:C.surfaceContainerLow,border:"none",borderRadius:"8px",padding:"8px",cursor:"pointer"}} aria-label="Menu">
+            <button className="admin-menu-btn" onClick={()=>setSidebarOpen(o=>!o)} style={{background:C.surfaceContainerLow,border:"none",borderRadius:"8px",padding:"8px",cursor:"pointer",alignItems:"center",justifyContent:"center"}} aria-label="Menu">
               <Icon name="menu" size={22}/>
             </button>
           </div>
