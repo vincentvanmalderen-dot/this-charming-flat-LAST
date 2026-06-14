@@ -1670,7 +1670,7 @@ function AdminRequests({ requests, setRequests, blockedDates, setBlockedDates, f
             <h3 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",fontSize:"1.1rem",marginBottom:"4px"}}>Edit booking</h3>
             <p style={{fontSize:"0.85rem",color:C.onSurfaceVariant,marginBottom:"20px"}}>{editModal.name}</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"16px"}}>
-              {[["Check-in","check_in","date"],["Check-out","check_out","date"],["Nights","nights","number"],["Amount (£)","total","number"],["Name","name","text"],["Email","email","email"]].map(([label,field,type])=>(
+              {[["Check-in","check_in","date"],["Check-out","check_out","date"],["Nights","nights","number"],["Amount (£)","total","number"],["Name","name","text"],["Email","email","email"],["Relationship / source","relationship","text"]].map(([label,field,type])=>(
                 <div key={field}>
                   <label style={{display:"block",fontSize:"0.72rem",fontWeight:"700",color:C.onSurfaceVariant,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"4px"}}>{label}</label>
                   <input type={type} value={editForm[field]||""} onChange={e=>setEditForm(f=>({...f,[field]:e.target.value}))} className="input-field" style={{fontSize:"0.88rem"}}/>
@@ -1679,7 +1679,7 @@ function AdminRequests({ requests, setRequests, blockedDates, setBlockedDates, f
             </div>
             <div style={{display:"flex",gap:"8px",justifyContent:"flex-end"}}>
               <button onClick={()=>setEditModal(null)} className="btn-ghost" style={{padding:"8px 16px",fontSize:"0.85rem"}}>Cancel</button>
-              <button onClick={()=>updateBooking(editModal,{check_in:editForm.check_in,check_out:editForm.check_out,nights:Number(editForm.nights),total:Number(editForm.total),name:editForm.name,email:editForm.email})} className="btn-primary" style={{padding:"8px 20px",fontSize:"0.85rem"}}>Save changes</button>
+              <button onClick={()=>updateBooking(editModal,{check_in:editForm.check_in,check_out:editForm.check_out,nights:Number(editForm.nights),total:Number(editForm.total),name:editForm.name,email:editForm.email,relationship:editForm.relationship})} className="btn-primary" style={{padding:"8px 20px",fontSize:"0.85rem"}}>Save changes</button>
             </div>
           </div>
         </div>
@@ -1808,6 +1808,12 @@ function AdminRequests({ requests, setRequests, blockedDates, setBlockedDates, f
                     onBlur={e=>{ if(Number(e.target.value)!==r.total) updateAmount(r,e.target.value); }}
                     style={{width:"60px",border:"none",background:"transparent",fontSize:"0.85rem",fontWeight:"700",color:C.onSurface,outline:"none"}}/>
                 </div>
+                {/* Edit booking */}
+                <button onClick={()=>{setEditForm({check_in:r.check_in,check_out:r.check_out,nights:r.nights,total:r.total,name:r.name,email:r.email,relationship:r.relationship||""});setEditModal(r);}}
+                  style={{display:"flex",alignItems:"center",gap:"5px",padding:"5px 12px",borderRadius:"6px",border:`1px solid ${C.outlineVariant}`,fontWeight:"700",fontSize:"0.8rem",cursor:"pointer",
+                    background:"white",color:C.onSurfaceVariant}}>
+                  <Icon name="edit" size={15}/>Edit
+                </button>
                 {/* Paid toggle */}
                 <button onClick={()=>togglePaid(r)}
                   style={{display:"flex",alignItems:"center",gap:"5px",padding:"5px 12px",borderRadius:"6px",border:"none",fontWeight:"700",fontSize:"0.8rem",cursor:"pointer",
