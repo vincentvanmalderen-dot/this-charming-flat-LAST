@@ -133,9 +133,8 @@ const C = {
 };
 
 const DEFAULT_PRICING = {
-  low:  { label: "Low season",  months: "Nov · Dec · Jan · Feb", note: "Terrace quiet — except Christmas/NYE at peak rates", airbnb: [118,118,118,106],  direct: [80,72,68,64] },
-  mid:  { label: "Mid season",  months: "Mar · Apr · May · Sep · Oct", note: "Terrace pleasant, solid demand — Sep can flex to peak", airbnb: [118,118,118,106], direct: [100,90,85,80] },
-  peak: { label: "Peak summer", months: "Jun · Jul · Aug", note: "Terrace at its best — Notting Hill Carnival, Pride & Arsenal fixtures", airbnb: [118,118,118,106], direct: [120,110,105,100] },
+  mid:  { label: "Mid season",  months: "Jan · Feb · Mar · Apr · May · Oct · Nov · Dec", note: "Solid demand year-round — the everyday rate for the flat.", airbnb: [118,118,118,106], direct: [100,90,85,80] },
+  peak: { label: "Peak",        months: "Jun · Jul · Aug · Sep + event dates", note: "Terrace at its best — summer, September, plus Arsenal home games, Pride, Carnival & other big dates.", airbnb: [118,118,118,106], direct: [120,110,105,100] },
 };
 
 // Airbnb real pricing (flat year-round, shown only in backoffice)
@@ -178,9 +177,15 @@ const CATEGORY_COLORS = {
 };
 
 function getSeason(month) {
-  if ([11,0,1].includes(month)) return "low";
-  if ([5,6,7].includes(month)) return "peak";
+  // Two-tier: PEAK = Jun,Jul,Aug,Sep · MID = everything else
+  if ([5,6,7,8].includes(month)) return "peak";
   return "mid";
+}
+// Determine season for a specific date, checking manual peak-date overrides.
+// peakDates = array of "YYYY-MM-DD" strings that are forced to PEAK.
+function getSeasonForDate(dateStr, peakDates=[]) {
+  if (peakDates && peakDates.includes(dateStr)) return "peak";
+  return getSeason(new Date(dateStr).getMonth());
 }
 function getNightIndex(n) {
   if (n<=1) return 0; if (n<=3) return 1; if (n<=5) return 2; return 3;
@@ -259,7 +264,7 @@ function Logo({ size=48 }) {
 
 // ─── CALENDAR ─────────────────────────────────────────────────────────────────
 
-function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], onSelectRange, selectedStart, selectedEnd, readOnly=false, compact=false }) {
+function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], peakDates=[], onSelectRange, selectedStart, selectedEnd, readOnly=false, compact=false, showSeasonMarks=true }) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -267,6 +272,7 @@ function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], onSelectRange, 
   const blockedSet = new Set(blockedDates);
   const airbnbSet = new Set(airbnbDates);
   const ownerSet = new Set(ownerDates);
+  const peakSet = new Set(peakDates);
 
   function toISO(y,m,d){ return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`; }
   function daysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
@@ -297,8 +303,8 @@ function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], onSelectRange, 
 
   const days=daysInMonth(viewYear,viewMonth), start=firstDay(viewYear,viewMonth);
   const season=getSeason(viewMonth);
-  const seasonLabel={low:"Low season",mid:"Mid season",peak:"Peak summer"}[season];
-  const seasonColor={low:"#ffdad5",mid:"#c8dfc8",peak:"#ffdad5"}[season];
+  const seasonLabel={mid:"Mid season",peak:"Peak season"}[season];
+  const seasonColor={mid:"#c8dfc8",peak:"#ffe0b3"}[season];
 
   return (
     <div style={{userSelect:"none"}}>
@@ -327,6 +333,10 @@ function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], onSelectRange, 
         {Array(days).fill(null).map((_,i)=>{
           const day=i+1, iso=toISO(viewYear,viewMonth,day), state=getState(iso);
           const isWknd=((start+i)%7)>=5;
+          // Determine per-date season: month rule + manual peak-date override
+          const dateSeason = peakSet.has(iso) ? "peak" : getSeason(viewMonth);
+          const isManualPeak = peakSet.has(iso);
+          const showMark = showSeasonMarks && (state==="free"||state==="selected"||state==="range"||state==="hover");
           const bg=state==="airbnb"?"#d4edda":state==="blocked"?"#ffdad5":state==="owner"?"#fff3cd":state==="past"?"transparent":state==="selected"?C.secondary:state==="range"||state==="hover"?"#dfe0ff":isWknd?C.surfaceContainerLow:C.surfaceContainerLowest;
           const color=state==="airbnb"?"#155724":state==="blocked"?"#930006":state==="owner"?"#856404":state==="past"?"#c0b8b0":state==="selected"?"white":C.onSurface;
           const fw=state==="selected"?"700":"400";
@@ -343,6 +353,7 @@ function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], onSelectRange, 
                 transition:"background 0.1s",position:"relative",
               }}>
               {day}
+              {showMark&&dateSeason==="peak"&&<div title={isManualPeak?"Peak (event date)":"Peak season"} style={{position:"absolute",top:"2px",right:"3px",fontSize:"0.5rem",fontWeight:"800",color:state==="selected"?"#ffe0b3":"#c77800",lineHeight:1}}>{isManualPeak?"★":"£"}</div>}
               {state==="blocked"&&<div style={{position:"absolute",bottom:"2px",left:"50%",transform:"translateX(-50%)",width:"4px",height:"4px",borderRadius:"50%",background:"#930006"}}/>}
               {state==="owner"&&<div style={{position:"absolute",bottom:"2px",left:"50%",transform:"translateX(-50%)",width:"4px",height:"4px",borderRadius:"50%",background:"#856404"}}/>}
             </div>
@@ -356,6 +367,14 @@ function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], onSelectRange, 
             <span>{label}</span>
           </div>
         ))}
+        {showSeasonMarks&&<>
+          <div style={{display:"flex",alignItems:"center",gap:"4px",fontSize:"0.7rem",color:C.onSurfaceVariant}}>
+            <span style={{fontSize:"0.7rem",fontWeight:"800",color:"#c77800"}}>£</span><span>Peak season</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:"4px",fontSize:"0.7rem",color:C.onSurfaceVariant}}>
+            <span style={{fontSize:"0.7rem",fontWeight:"800",color:"#c77800"}}>★</span><span>Peak event date</span>
+          </div>
+        </>}
       </div>
     </div>
   );
@@ -493,7 +512,7 @@ function GuestPhotoGallery({ photos }) {
         {photos.map((p,i) => (
           <button key={i} onClick={() => setLightbox(i)}
             style={{borderRadius:"12px",overflow:"hidden",aspectRatio:"4/3",background:C.surfaceContainerHigh,border:"none",padding:0,cursor:"zoom-in",display:"block",position:"relative"}}>
-            <img src={p.data} alt={p.caption||`Photo ${i+1}`}
+            <img src={p.data} alt={p.caption||`Photo ${i+1}`} loading="lazy" decoding="async"
               style={{width:"100%",height:"100%",objectFit:"cover",transition:"transform 0.4s",display:"block"}}
               onMouseEnter={e=>e.target.style.transform="scale(1.04)"}
               onMouseLeave={e=>e.target.style.transform="scale(1)"}/>
@@ -628,7 +647,7 @@ function GuestHome({ info, photos, setTab, tips }) {
 
 // ─── GUEST: AVAILABILITY ──────────────────────────────────────────────────────
 
-function GuestAvailability({ blockedDates, ownerDates, airbnbDates, setTab }) {
+function GuestAvailability({ blockedDates, ownerDates, airbnbDates, peakDates=[], setTab }) {
   return (
     <div className="fade-in" style={{padding:"120px clamp(20px,5vw,48px) 80px",maxWidth:"1280px",margin:"0 auto"}}>
       <div style={{marginBottom:"48px"}}>
@@ -641,7 +660,7 @@ function GuestAvailability({ blockedDates, ownerDates, airbnbDates, setTab }) {
       </div>
       <div style={{maxWidth:"480px"}}>
         <div className="card" style={{padding:"32px"}}>
-          <Calendar blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} onSelectRange={()=>{}} readOnly={true}/>
+          <Calendar blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} onSelectRange={()=>{}} readOnly={true}/>
         </div>
       </div>
       <div style={{marginTop:"40px"}}>
@@ -689,7 +708,7 @@ function GuestPricing({ pricing }) {
           </div>
         ))}
       </div>
-      <p style={{fontSize:"0.78rem",color:C.onSurfaceVariant,marginTop:"24px",fontStyle:"italic"}}>All prices in GBP · Prices may vary based on demand</p>
+      <p style={{fontSize:"0.78rem",color:C.onSurfaceVariant,marginTop:"24px",fontStyle:"italic"}}>All prices in GBP · Peak rates also apply to selected event dates (Arsenal home games, Pride, Carnival & other big London dates)</p>
     </div>
   );
 }
@@ -822,7 +841,7 @@ function GuestAbout({ info, textBlocks=[] }) {
 
 // ─── GUEST: BOOK ──────────────────────────────────────────────────────────────
 
-function GuestBook({ blockedDates, ownerDates, airbnbDates, pricing, onSubmitRequest }) {
+function GuestBook({ blockedDates, ownerDates, airbnbDates, peakDates=[], pricing, onSubmitRequest }) {
   const [selStart,setSelStart]=useState(null);
   const [selEnd,setSelEnd]=useState(null);
   const [form,setForm]=useState({name:"",email:"",phone:"",relationship:"",message:""});
@@ -846,9 +865,23 @@ function GuestBook({ blockedDates, ownerDates, airbnbDates, pricing, onSubmitReq
   function calcPrice(){
     if(!selStart||!selEnd) return null;
     const nights=Math.round((new Date(selEnd)-new Date(selStart))/86400000);
-    const season=getSeason(new Date(selStart).getMonth());
+    if(nights<=0) return null;
     const ni=getNightIndex(nights);
-    return{nights,season,total:pricing[season].direct[ni]*nights,perNight:pricing[season].direct[ni],seasonLabel:pricing[season].label};
+    // Price each night by its own season (month rule + manual peak-date override)
+    let total=0, peakNights=0, midNights=0;
+    const cur=new Date(selStart);
+    for(let n=0;n<nights;n++){
+      const iso=cur.toISOString().slice(0,10);
+      const s=getSeasonForDate(iso,peakDates);
+      total+=pricing[s].direct[ni];
+      if(s==="peak") peakNights++; else midNights++;
+      cur.setDate(cur.getDate()+1);
+    }
+    // Overall season label: mixed if both present
+    const season = peakNights>0 && midNights>0 ? "mixed" : (peakNights>0?"peak":"mid");
+    const seasonLabel = season==="mixed" ? `Mixed (${peakNights} peak · ${midNights} mid)` : pricing[season].label;
+    const perNight = Math.round(total/nights);
+    return{nights,season,total,perNight,seasonLabel,peakNights,midNights};
   }
   const pc=calcPrice();
 
@@ -891,7 +924,7 @@ function GuestBook({ blockedDates, ownerDates, airbnbDates, pricing, onSubmitReq
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:"32px"}}>
         <div className="card" style={{padding:"32px"}}>
           <h3 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",marginBottom:"20px",fontSize:"1rem",textTransform:"uppercase",letterSpacing:"0.06em",color:C.onSurfaceVariant}}>① Select dates</h3>
-          <Calendar blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} onSelectRange={handleRange} selectedStart={selStart} selectedEnd={selEnd}/>
+          <Calendar blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} onSelectRange={handleRange} selectedStart={selStart} selectedEnd={selEnd}/>
           {selStart&&!selEnd&&<p style={{marginTop:"12px",fontSize:"0.82rem",color:C.onSurfaceVariant}}>Now click your check-out date</p>}
           {pc&&(
             <div style={{marginTop:"16px",background:C.surfaceContainerLow,borderRadius:"10px",padding:"16px"}}>
@@ -909,7 +942,7 @@ function GuestBook({ blockedDates, ownerDates, airbnbDates, pricing, onSubmitReq
 
         <div className="card" style={{padding:"32px"}}>
           <h3 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",marginBottom:"20px",fontSize:"1rem",textTransform:"uppercase",letterSpacing:"0.06em",color:C.onSurfaceVariant}}>② Your details</h3>
-          {[["name","Your name","text","e.g. Sarah",true],["email","Email address","email","sarah@email.com",true],["phone","Phone","tel","+44 ...",false],["relationship","Your relationship to Vincent or Elina","text","e.g. friend, colleague, family...",true]].map(([f,label,type,ph,req])=>(
+          {[["name","Your name","text","e.g. Sarah",true],["email","Email address","email","sarah@email.com",true],["phone","Phone","tel","+44 ...",false],["relationship","Your relationship to Vincent or Elina, or a link to your guest Airbnb profile","text","e.g. friend, colleague — or paste your Airbnb profile link",true]].map(([f,label,type,ph,req])=>(
             <div key={f} style={{marginBottom:"14px"}}>
               <label htmlFor={`b-${f}`} style={{display:"block",fontSize:"0.78rem",fontWeight:"600",color:C.onSurfaceVariant,marginBottom:"5px"}}>{label}{req&&<span style={{color:C.error}}> *</span>}</label>
               <input id={`b-${f}`} type={type} placeholder={ph} value={form[f]} required={req}
@@ -1435,7 +1468,7 @@ function AdminSidebar({ activeTab, setTab, pendingCount, sidebarOpen, setSidebar
 
 // ─── ADMIN: CALENDAR TAB ──────────────────────────────────────────────────────
 
-function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDates, airbnbDates, setAirbnbDates, requests, flashSave }) {
+function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDates, airbnbDates, setAirbnbDates, peakDates, setPeakDates, requests, flashSave }) {
   const [selStart,setSelStart]=useState(null);
   const [selEnd,setSelEnd]=useState(null);
   const [note,setNote]=useState("");
@@ -1483,6 +1516,25 @@ function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDate
     flashSave("Vincent's stay blocked ✓");
   }
 
+  async function markPeak(){
+    if(!selStart) return;
+    const end=selEnd||selStart;
+    const range=dateRange(selStart,end);
+    const next=[...new Set([...(peakDates||[]),...range])];
+    setPeakDates(next); await sb.setSetting("peak_dates",next);
+    setSelStart(null);setSelEnd(null);setNote("");
+    flashSave("Marked as peak pricing ✓");
+  }
+  async function unmarkPeak(){
+    if(!selStart) return;
+    const end=selEnd||selStart;
+    const range=new Set(dateRange(selStart,end));
+    const next=(peakDates||[]).filter(d=>!range.has(d));
+    setPeakDates(next); await sb.setSetting("peak_dates",next);
+    setSelStart(null);setSelEnd(null);
+    flashSave("Peak pricing removed ✓");
+  }
+
   // Group blocked dates
   function groupDates(dates){
     if(!dates.length) return [];
@@ -1505,17 +1557,21 @@ function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDate
         <div className="card" style={{padding:"32px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"24px"}}>
             <h2 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",fontSize:"1.3rem"}}>Manage Availability</h2>
-            <div style={{display:"flex",gap:"8px"}}>
+            <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
               {selStart&&<>
                 <button className="btn-ghost" onClick={unblockDates} style={{fontSize:"0.8rem",padding:"6px 14px"}}>Unblock</button>
                 <button className="btn-secondary" onClick={blockDates} style={{fontSize:"0.8rem",padding:"6px 14px"}}>Block dates</button>
                 <button onClick={blockOwner} style={{background:"#ffc107",color:"#333",border:"none",borderRadius:"6px",padding:"6px 14px",fontWeight:"700",fontSize:"0.8rem",cursor:"pointer",display:"flex",alignItems:"center",gap:"4px"}}>
                   <Icon name="home" size={14}/>Vincent's stay
                 </button>
+                <button onClick={markPeak} style={{background:"#c77800",color:"white",border:"none",borderRadius:"6px",padding:"6px 14px",fontWeight:"700",fontSize:"0.8rem",cursor:"pointer",display:"flex",alignItems:"center",gap:"4px"}}>
+                  ★ Peak price
+                </button>
+                <button className="btn-ghost" onClick={unmarkPeak} style={{fontSize:"0.8rem",padding:"6px 14px"}}>Remove peak</button>
               </>}
             </div>
           </div>
-          <Calendar blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} onSelectRange={handleRange} selectedStart={selStart} selectedEnd={selEnd}/>
+          <Calendar blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} onSelectRange={handleRange} selectedStart={selStart} selectedEnd={selEnd}/>
           {selStart&&selEnd&&(
             <div style={{marginTop:"16px",display:"flex",gap:"12px",alignItems:"center"}}>
               <input placeholder="Note (e.g. Airbnb booking)" value={note} onChange={e=>setNote(e.target.value)}
@@ -2621,7 +2677,7 @@ function AdminIcalSync({ blockedDates, setBlockedDates, airbnbDates, setAirbnbDa
 
 // ─── ADMIN VIEW ───────────────────────────────────────────────────────────────
 
-function AdminView({ blockedDates, setBlockedDates, ownerDates, setOwnerDates, pricing, setPricing, info, setInfo, showPricing, setShowPricing, photos, setPhotos, tips, setTips, textBlocks, setTextBlocks, airbnbDates, setAirbnbDates, airbnbBookings, setAirbnbBookings, costs, setCosts, guestbookEntries, setGuestbookEntries, requests, setRequests, onLogout }) {
+function AdminView({ blockedDates, setBlockedDates, ownerDates, setOwnerDates, peakDates, setPeakDates, pricing, setPricing, info, setInfo, showPricing, setShowPricing, photos, setPhotos, tips, setTips, textBlocks, setTextBlocks, airbnbDates, setAirbnbDates, airbnbBookings, setAirbnbBookings, costs, setCosts, guestbookEntries, setGuestbookEntries, requests, setRequests, onLogout }) {
   const [tab,setTab]=useState("calendar");
   const [saved,setSaved]=useState("");
   const [sidebarOpen,setSidebarOpen]=useState(false);
@@ -2658,7 +2714,7 @@ function AdminView({ blockedDates, setBlockedDates, ownerDates, setOwnerDates, p
           </div>
         </header>
 
-        {tab==="calendar"&&<AdminCalendar blockedDates={blockedDates} setBlockedDates={setBlockedDates} ownerDates={ownerDates} setOwnerDates={setOwnerDates} airbnbDates={airbnbDates} setAirbnbDates={setAirbnbDates} requests={requests} flashSave={flashSave}/>}
+        {tab==="calendar"&&<AdminCalendar blockedDates={blockedDates} setBlockedDates={setBlockedDates} ownerDates={ownerDates} setOwnerDates={setOwnerDates} airbnbDates={airbnbDates} setAirbnbDates={setAirbnbDates} peakDates={peakDates} setPeakDates={setPeakDates} requests={requests} flashSave={flashSave}/>}
         {tab==="requests"&&<AdminRequests requests={requests} setRequests={setRequests} blockedDates={blockedDates} setBlockedDates={setBlockedDates} flashSave={flashSave}/>}
         {tab==="photos"&&<AdminPhotos photos={photos} setPhotos={setPhotos} flashSave={flashSave}/>}
         {tab==="tips"&&<AdminAngelEdit tips={tips} setTips={setTips} flashSave={flashSave}/>}
@@ -2712,51 +2768,101 @@ export default function App() {
   const [view,setView]=useState("guest");
   const [isAdmin,setIsAdmin]=useState(false);
   const [loading,setLoading]=useState(true);
-  const [guestTab,setGuestTab]=useState("home");
+  const [guestTab,setGuestTabRaw]=useState(()=>{
+    // Initialise from the URL path so each tab is deep-linkable
+    if(typeof window==="undefined") return "home";
+    const path=window.location.pathname.replace(/^\/+|\/+$/g,"").toLowerCase();
+    const valid=["home","availability","pricing","about","guestbook","book","privacy"];
+    return valid.includes(path)?path:"home";
+  });
+  // Wrap setter so navigation updates the browser URL too
+  const setGuestTab=(tab)=>{
+    setGuestTabRaw(tab);
+    if(typeof window!=="undefined"){
+      const path=tab==="home"?"/":`/${tab}`;
+      if(window.location.pathname!==path) window.history.pushState({tab},"",path);
+      window.scrollTo(0,0);
+    }
+  };
+  // Handle browser back/forward buttons
+  useEffect(()=>{
+    function onPop(){
+      const path=window.location.pathname.replace(/^\/+|\/+$/g,"").toLowerCase();
+      const valid=["home","availability","pricing","about","guestbook","book","privacy"];
+      setGuestTabRaw(valid.includes(path)?path:"home");
+    }
+    window.addEventListener("popstate",onPop);
+    return ()=>window.removeEventListener("popstate",onPop);
+  },[]);
 
   const [blockedDates,setBlockedDates]=useState([]);
   const [ownerDates,setOwnerDates]=useState([]);
   const [airbnbDates,setAirbnbDates]=useState([]);
   const [airbnbBookings,setAirbnbBookings]=useState([]);
+  const [peakDates,setPeakDates]=useState([]);
   const [costs,setCosts]=useState([]);
   const [guestbookEntries,setGuestbookEntries]=useState([]);
   const [pricing,setPricing]=useState(DEFAULT_PRICING);
   const [info,setInfo]=useState(DEFAULT_INFO);
   const [showPricing,setShowPricing]=useState(true);
   const [photos,setPhotos]=useState([]);
+  const [photosLoading,setPhotosLoading]=useState(true);
   const [tips,setTips]=useState([]);
   const [textBlocks,setTextBlocks]=useState([]);
   const [requests,setRequests]=useState([]);
 
   useEffect(()=>{
-    async function load(){
+    // ── Phase 1: load lightweight critical data, then show the site immediately ──
+    async function loadCore(){
       try{
-        const [b,od,p,i,sp,ph,t,tb,abd,abb,co,gb]=await Promise.all([
+        const [b,od,p,i,sp,abd,abb,pk]=await Promise.all([
           sb.getSetting("blocked_dates"),sb.getSetting("owner_dates"),sb.getSetting("pricing"),sb.getSetting("info"),
-          sb.getSetting("show_pricing"),sb.getSetting("photos"),sb.getSetting("tips"),sb.getSetting("text_blocks"),
-          sb.getSetting("airbnb_dates"),sb.getSetting("airbnb_bookings"),sb.getSetting("costs"),sb.getSetting("guestbook"),
+          sb.getSetting("show_pricing"),sb.getSetting("airbnb_dates"),sb.getSetting("airbnb_bookings"),sb.getSetting("peak_dates"),
         ]);
         if(b) setBlockedDates(b);
         if(od) setOwnerDates(od);
-        if(p) setPricing(p);
+        if(p){
+          // Migrate legacy 3-tier pricing (low/mid/peak) → 2-tier (mid/peak)
+          const migrated={...p};
+          if(migrated.low) delete migrated.low;
+          if(!migrated.mid) migrated.mid=DEFAULT_PRICING.mid;
+          if(!migrated.peak) migrated.peak=DEFAULT_PRICING.peak;
+          // refresh month labels/notes to the new two-tier wording
+          migrated.mid={...migrated.mid,months:DEFAULT_PRICING.mid.months,note:DEFAULT_PRICING.mid.note,label:"Mid season"};
+          migrated.peak={...migrated.peak,months:DEFAULT_PRICING.peak.months,note:DEFAULT_PRICING.peak.note,label:"Peak"};
+          setPricing(migrated);
+        }
         if(i) setInfo(i);
         if(sp!==null) setShowPricing(sp);
+        if(abd) setAirbnbDates(abd);
+        if(abb) setAirbnbBookings(abb);
+        if(pk) setPeakDates(pk);
+      }catch(e){
+        console.error("Core load error:", e);
+      }finally{
+        setLoading(false);  // show site as soon as core data is ready
+      }
+    }
+    // ── Phase 2: load heavier / non-critical data in the background ──
+    async function loadExtras(){
+      try{
+        const [ph,t,tb,co,gb]=await Promise.all([
+          sb.getSetting("photos"),sb.getSetting("tips"),sb.getSetting("text_blocks"),
+          sb.getSetting("costs"),sb.getSetting("guestbook"),
+        ]);
         if(ph) setPhotos(ph);
         if(t) setTips(t);
         if(tb) setTextBlocks(tb);
-        if(abd) setAirbnbDates(abd);
-        if(abb) setAirbnbBookings(abb);
         if(co) setCosts(co);
         if(gb) setGuestbookEntries(gb);
-        // Requests loaded separately when admin logs in
       }catch(e){
-        console.error("Load error:", e);
-        // Always show the site even if data loading fails
+        console.error("Extras load error:", e);
       }finally{
-        setLoading(false);
+        setPhotosLoading(false);
       }
     }
-    load();
+    loadCore();
+    loadExtras();
   },[]);
 
   async function loadRequests(){
@@ -2794,12 +2900,12 @@ export default function App() {
           <GuestNav activeTab={guestTab} setTab={setGuestTab} showPricing={showPricing}/>
           <CookieBanner/>
           {guestTab==="home"&&<GuestHome info={info} photos={photos} setTab={setGuestTab} tips={tips}/>}
-          {guestTab==="availability"&&<GuestAvailability blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} setTab={setGuestTab}/>}
+          {guestTab==="availability"&&<GuestAvailability blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} setTab={setGuestTab}/>}
           {guestTab==="pricing"&&showPricing&&<GuestPricing pricing={pricing}/>}
           {guestTab==="about"&&<GuestAbout info={info} textBlocks={textBlocks}/>}
           {guestTab==="privacy"&&<GuestPrivacy info={info}/>}
           {guestTab==="guestbook"&&<GuestGuestbook entries={guestbookEntries}/>}
-          {guestTab==="book"&&<GuestBook blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} pricing={pricing} onSubmitRequest={addRequest}/>}
+          {guestTab==="book"&&<GuestBook blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} pricing={pricing} onSubmitRequest={addRequest}/>}
           <GuestFooter info={info} setTab={setGuestTab}/>
         </div>
       )}
@@ -2808,6 +2914,7 @@ export default function App() {
         <AdminView
           blockedDates={blockedDates} setBlockedDates={setBlockedDates}
           ownerDates={ownerDates} setOwnerDates={setOwnerDates}
+          peakDates={peakDates} setPeakDates={setPeakDates}
           pricing={pricing} setPricing={setPricing}
           info={info} setInfo={setInfo}
           showPricing={showPricing} setShowPricing={setShowPricing}
