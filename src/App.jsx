@@ -1541,6 +1541,28 @@ function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDate
     flashSave("Peak pricing removed ✓");
   }
 
+  // Remove orphaned check-out dates: dates in blocked_dates that are the check-out
+  // day of a confirmed booking (so not an actual booked night) and not owner/airbnb.
+  async function cleanupCheckoutDates(){
+    const checkoutDates=new Set(
+      requests.filter(r=>r.status==="confirmed").map(r=>r.check_out)
+    );
+    const bookedNights=new Set(
+      requests.filter(r=>r.status==="confirmed").flatMap(r=>dateRange(r.check_in,r.check_out,false))
+    );
+    const ownerSet=new Set(ownerDates), airbnbSet=new Set(airbnbDates);
+    // A date is orphaned if it's a checkout date, currently blocked, but not an actual
+    // booked night, not a Vincent stay, and not an Airbnb date.
+    const toRemove=blockedDates.filter(d=>
+      checkoutDates.has(d) && !bookedNights.has(d) && !ownerSet.has(d) && !airbnbSet.has(d)
+    );
+    if(toRemove.length===0){ flashSave("No check-out dates to clean ✓"); return; }
+    const removeSet=new Set(toRemove);
+    const next=blockedDates.filter(d=>!removeSet.has(d));
+    setBlockedDates(next); await sb.setSetting("blocked_dates",next);
+    flashSave(`Cleared ${toRemove.length} check-out date${toRemove.length>1?"s":""} ✓`);
+  }
+
   // Group blocked dates
   function groupDates(dates){
     if(!dates.length) return [];
@@ -1613,7 +1635,12 @@ function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDate
 
           {/* Blocked periods */}
           <div className="card" style={{padding:"24px",flex:1}}>
-            <h3 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",fontSize:"1rem",marginBottom:"16px"}}>Blocked Periods</h3>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px",gap:"8px",flexWrap:"wrap"}}>
+              <h3 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",fontSize:"1rem"}}>Not available</h3>
+              <button onClick={cleanupCheckoutDates} className="btn-ghost" style={{fontSize:"0.72rem",padding:"4px 10px"}} title="Free up check-out dates left blocked by past bookings">
+                Clean check-out dates
+              </button>
+            </div>
             {groupDates(blockedDates).length===0?<p style={{fontSize:"0.85rem",color:C.onSurfaceVariant}}>No dates blocked.</p>:(
               <div style={{maxHeight:"240px",overflowY:"auto",display:"flex",flexDirection:"column",gap:"4px"}}>
                 {groupDates(blockedDates).map(([s,e],i)=>(
@@ -1656,7 +1683,9 @@ function AdminRequests({ requests, setRequests, blockedDates, setBlockedDates, f
 
   async function confirm(r){
     await sb.updateRequest(r.id,"confirmed");
-    const next=[...new Set([...blockedDates,...dateRange(r.check_in,r.check_out)])];
+    // Exclude the check-out date (includeEnd=false) — the guest leaves that morning,
+    // so it's free for the next check-in and shouldn't be blocked.
+    const next=[...new Set([...blockedDates,...dateRange(r.check_in,r.check_out,false)])];
     setBlockedDates(next); await sb.setSetting("blocked_dates",next);
     setRequests(prev=>prev.map(req=>req.id===r.id?{...req,status:"confirmed"}:req));
     flashSave("Confirmed & dates blocked ✓");
