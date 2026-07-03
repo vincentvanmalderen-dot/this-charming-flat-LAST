@@ -264,7 +264,7 @@ function Logo({ size=48 }) {
 
 // ─── CALENDAR ─────────────────────────────────────────────────────────────────
 
-function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], peakDates=[], onSelectRange, selectedStart, selectedEnd, readOnly=false, compact=false, showSeasonMarks=true }) {
+function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], peakDates=[], bookedDates=[], onSelectRange, selectedStart, selectedEnd, readOnly=false, compact=false, showSeasonMarks=true }) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -273,6 +273,7 @@ function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], peakDates=[], o
   const airbnbSet = new Set(airbnbDates);
   const ownerSet = new Set(ownerDates);
   const peakSet = new Set(peakDates);
+  const bookedSet = new Set(bookedDates);
 
   function toISO(y,m,d){ return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`; }
   function daysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
@@ -281,8 +282,12 @@ function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], peakDates=[], o
   function getState(iso){
     const d=new Date(iso), todayISO=today.toISOString().slice(0,10);
     if(airbnbSet.has(iso)) return "airbnb";
-    if(blockedSet.has(iso)) return "blocked";
+    // "Vincent's stay" is an explicit manual override — highest priority (visual only).
     if(ownerSet.has(iso)) return "owner";
+    // A confirmed booking shows red, even though its dates are also in blockedDates.
+    if(bookedSet.has(iso)) return "booked";
+    // Pure manual block (not tied to a booking) shows grey "Not available".
+    if(blockedSet.has(iso)) return "blocked";
     if(d<new Date(todayISO)) return "past";
     if(iso===selectedStart||iso===selectedEnd) return "selected";
     if(selectedStart&&selectedEnd&&iso>selectedStart&&iso<selectedEnd) return "range";
@@ -293,7 +298,7 @@ function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], peakDates=[], o
   function handleClick(iso){
     const isPast = new Date(iso)<new Date(today.toISOString().slice(0,10));
     const isAirbnb = airbnbSet.has(iso);
-    const isUnavailable = blockedSet.has(iso)||ownerSet.has(iso)||isAirbnb;
+    const isUnavailable = blockedSet.has(iso)||ownerSet.has(iso)||bookedSet.has(iso)||isAirbnb;
     // Guest view: can't click unavailable or past dates
     if(readOnly && (isUnavailable || isPast)) return;
     // Admin view: can't click airbnb dates or past dates
@@ -337,8 +342,8 @@ function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], peakDates=[], o
           const dateSeason = peakSet.has(iso) ? "peak" : getSeason(viewMonth);
           const isManualPeak = peakSet.has(iso);
           const showMark = showSeasonMarks && (state==="free"||state==="selected"||state==="range"||state==="hover");
-          const bg=state==="airbnb"?"#d4edda":state==="blocked"?"#ffdad5":state==="owner"?"#fff3cd":state==="past"?"transparent":state==="selected"?C.secondary:state==="range"||state==="hover"?"#dfe0ff":isWknd?C.surfaceContainerLow:C.surfaceContainerLowest;
-          const color=state==="airbnb"?"#155724":state==="blocked"?"#930006":state==="owner"?"#856404":state==="past"?"#c0b8b0":state==="selected"?"white":C.onSurface;
+          const bg=state==="airbnb"?"#d4edda":state==="booked"?"#ffdad5":state==="blocked"?"#e0e0e0":state==="owner"?"#fff3cd":state==="past"?"transparent":state==="selected"?C.secondary:state==="range"||state==="hover"?"#dfe0ff":isWknd?C.surfaceContainerLow:C.surfaceContainerLowest;
+          const color=state==="airbnb"?"#155724":state==="booked"?"#930006":state==="blocked"?"#5a5a5a":state==="owner"?"#856404":state==="past"?"#c0b8b0":state==="selected"?"white":C.onSurface;
           const fw=state==="selected"?"700":"400";
           return (
             <div key={iso}
@@ -347,21 +352,22 @@ function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], peakDates=[], o
               onMouseLeave={()=>!readOnly&&setHover(null)}
               style={{
                 textAlign:"center",padding:compact?"5px 2px":"7px 2px",borderRadius:"6px",
-                background:bg,color,cursor:(state==="past"||(readOnly&&(state==="blocked"||state==="owner"||state==="airbnb"))||(!readOnly&&state==="airbnb"))?"default":"pointer",
+                background:bg,color,cursor:(state==="past"||(readOnly&&(state==="blocked"||state==="booked"||state==="owner"||state==="airbnb"))||(!readOnly&&state==="airbnb"))?"default":"pointer",
                 fontSize:"0.82rem",fontWeight:fw,
                 border:state==="selected"?`2px solid ${C.primary}`:"2px solid transparent",
                 transition:"background 0.1s",position:"relative",
               }}>
               {day}
               {showMark&&dateSeason==="peak"&&<div title={isManualPeak?"Peak (event date)":"Peak season"} style={{position:"absolute",top:"2px",right:"3px",fontSize:"0.5rem",fontWeight:"800",color:state==="selected"?"#ffe0b3":"#c77800",lineHeight:1}}>{isManualPeak?"★":"£"}</div>}
-              {state==="blocked"&&<div style={{position:"absolute",bottom:"2px",left:"50%",transform:"translateX(-50%)",width:"4px",height:"4px",borderRadius:"50%",background:"#930006"}}/>}
+              {state==="booked"&&<div style={{position:"absolute",bottom:"2px",left:"50%",transform:"translateX(-50%)",width:"4px",height:"4px",borderRadius:"50%",background:"#930006"}}/>}
+              {state==="blocked"&&<div style={{position:"absolute",bottom:"2px",left:"50%",transform:"translateX(-50%)",width:"4px",height:"4px",borderRadius:"50%",background:"#5a5a5a"}}/>}
               {state==="owner"&&<div style={{position:"absolute",bottom:"2px",left:"50%",transform:"translateX(-50%)",width:"4px",height:"4px",borderRadius:"50%",background:"#856404"}}/>}
             </div>
           );
         })}
       </div>
       <div style={{display:"flex",gap:"12px",marginTop:"0.75rem",flexWrap:"wrap"}}>
-        {[[C.surfaceContainerLowest,"Available",C.outlineVariant],[C.primaryFixed,"Booked","#ffb4aa"],["#fff3cd","Vincent's stay","#ffc107"],["#dfe0ff","Selected","#bcc2ff"]].map(([bg,label,border])=>(
+        {[[C.surfaceContainerLowest,"Available",C.outlineVariant],["#ffdad5","Booked","#ffb4aa"],["#e0e0e0","Not available","#bbb"],["#fff3cd","Vincent's stay","#ffc107"],["#dfe0ff","Selected","#bcc2ff"]].map(([bg,label,border])=>(
           <div key={label} style={{display:"flex",alignItems:"center",gap:"5px",fontSize:"0.7rem",color:C.onSurfaceVariant}}>
             <div style={{width:"10px",height:"10px",borderRadius:"2px",background:bg,border:`1px solid ${border}`}}/>
             <span>{label}</span>
@@ -1551,6 +1557,11 @@ function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDate
 
   const upcoming=requests.filter(r=>r.status==="confirmed"&&new Date(r.check_in)>=new Date()).sort((a,b)=>new Date(a.check_in)-new Date(b.check_in)).slice(0,3);
 
+  // Dates that belong to a real confirmed booking (shown red), vs pure manual blocks (grey)
+  const bookedDates=[...new Set(
+    requests.filter(r=>r.status==="confirmed").flatMap(r=>dateRange(r.check_in,r.check_out,false))
+  )];
+
   return (
     <div className="slide-in">
       <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:"24px"}}>
@@ -1571,7 +1582,7 @@ function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDate
               </>}
             </div>
           </div>
-          <Calendar blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} onSelectRange={handleRange} selectedStart={selStart} selectedEnd={selEnd}/>
+          <Calendar blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} bookedDates={bookedDates} onSelectRange={handleRange} selectedStart={selStart} selectedEnd={selEnd}/>
           {selStart&&selEnd&&(
             <div style={{marginTop:"16px",display:"flex",gap:"12px",alignItems:"center"}}>
               <input placeholder="Note (e.g. Airbnb booking)" value={note} onChange={e=>setNote(e.target.value)}
