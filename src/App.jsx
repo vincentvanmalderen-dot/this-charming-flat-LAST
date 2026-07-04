@@ -282,12 +282,10 @@ function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], peakDates=[], b
   function getState(iso){
     const d=new Date(iso), todayISO=today.toISOString().slice(0,10);
     if(airbnbSet.has(iso)) return "airbnb";
-    // "Vincent's stay" is an explicit manual override — highest priority (visual only).
-    if(ownerSet.has(iso)) return "owner";
-    // A confirmed booking shows red, even though its dates are also in blockedDates.
-    if(bookedSet.has(iso)) return "booked";
-    // Pure manual block (not tied to a booking) shows grey "Not available".
-    if(blockedSet.has(iso)) return "blocked";
+    // Manual overrides win over a booking's own colour (booking + revenue stay intact):
+    if(ownerSet.has(iso)) return "owner";       // Vincent's stay (yellow)
+    if(blockedSet.has(iso)) return "blocked";   // Not available (grey)
+    if(bookedSet.has(iso)) return "booked";     // Confirmed booking (red)
     if(d<new Date(todayISO)) return "past";
     if(iso===selectedStart||iso===selectedEnd) return "selected";
     if(selectedStart&&selectedEnd&&iso>selectedStart&&iso<selectedEnd) return "range";
@@ -653,7 +651,7 @@ function GuestHome({ info, photos, setTab, tips }) {
 
 // ─── GUEST: AVAILABILITY ──────────────────────────────────────────────────────
 
-function GuestAvailability({ blockedDates, ownerDates, airbnbDates, peakDates=[], setTab }) {
+function GuestAvailability({ blockedDates, ownerDates, airbnbDates, peakDates=[], bookedDates=[], setTab }) {
   return (
     <div className="fade-in" style={{padding:"120px clamp(20px,5vw,48px) 80px",maxWidth:"1280px",margin:"0 auto"}}>
       <div style={{marginBottom:"48px"}}>
@@ -666,7 +664,7 @@ function GuestAvailability({ blockedDates, ownerDates, airbnbDates, peakDates=[]
       </div>
       <div style={{maxWidth:"480px"}}>
         <div className="card" style={{padding:"32px"}}>
-          <Calendar blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} onSelectRange={()=>{}} readOnly={true}/>
+          <Calendar blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} bookedDates={bookedDates} onSelectRange={()=>{}} readOnly={true}/>
         </div>
       </div>
       <div style={{marginTop:"40px"}}>
@@ -847,7 +845,7 @@ function GuestAbout({ info, textBlocks=[] }) {
 
 // ─── GUEST: BOOK ──────────────────────────────────────────────────────────────
 
-function GuestBook({ blockedDates, ownerDates, airbnbDates, peakDates=[], pricing, onSubmitRequest }) {
+function GuestBook({ blockedDates, ownerDates, airbnbDates, peakDates=[], bookedDates=[], pricing, onSubmitRequest }) {
   const [selStart,setSelStart]=useState(null);
   const [selEnd,setSelEnd]=useState(null);
   const [form,setForm]=useState({name:"",email:"",phone:"",relationship:"",message:""});
@@ -930,7 +928,7 @@ function GuestBook({ blockedDates, ownerDates, airbnbDates, peakDates=[], pricin
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:"32px"}}>
         <div className="card" style={{padding:"32px"}}>
           <h3 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",marginBottom:"20px",fontSize:"1rem",textTransform:"uppercase",letterSpacing:"0.06em",color:C.onSurfaceVariant}}>① Select dates</h3>
-          <Calendar blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} onSelectRange={handleRange} selectedStart={selStart} selectedEnd={selEnd}/>
+          <Calendar blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} bookedDates={bookedDates} onSelectRange={handleRange} selectedStart={selStart} selectedEnd={selEnd}/>
           {selStart&&!selEnd&&<p style={{marginTop:"12px",fontSize:"0.82rem",color:C.onSurfaceVariant}}>Now click your check-out date</p>}
           {pc&&(
             <div style={{marginTop:"16px",background:C.surfaceContainerLow,borderRadius:"10px",padding:"16px"}}>
@@ -1474,7 +1472,7 @@ function AdminSidebar({ activeTab, setTab, pendingCount, sidebarOpen, setSidebar
 
 // ─── ADMIN: CALENDAR TAB ──────────────────────────────────────────────────────
 
-function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDates, airbnbDates, setAirbnbDates, peakDates, setPeakDates, requests, flashSave }) {
+function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDates, airbnbDates, setAirbnbDates, peakDates, setPeakDates, bookedDates=[], requests, flashSave }) {
   const [selStart,setSelStart]=useState(null);
   const [selEnd,setSelEnd]=useState(null);
   const [note,setNote]=useState("");
@@ -1579,11 +1577,6 @@ function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDate
 
   const upcoming=requests.filter(r=>r.status==="confirmed"&&new Date(r.check_in)>=new Date()).sort((a,b)=>new Date(a.check_in)-new Date(b.check_in)).slice(0,3);
 
-  // Dates that belong to a real confirmed booking (shown red), vs pure manual blocks (grey)
-  const bookedDates=[...new Set(
-    requests.filter(r=>r.status==="confirmed").flatMap(r=>dateRange(r.check_in,r.check_out,false))
-  )];
-
   return (
     <div className="slide-in">
       <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:"24px"}}>
@@ -1665,7 +1658,7 @@ function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDate
 
 // ─── ADMIN: REQUESTS TAB ──────────────────────────────────────────────────────
 
-function AdminRequests({ requests, setRequests, blockedDates, setBlockedDates, flashSave }) {
+function AdminRequests({ requests, setRequests, blockedDates, setBlockedDates, bookedDates, setBookedDates, flashSave }) {
   const [filter,setFilter]=useState("all");
   const [emailModal,setEmailModal]=useState(null);
   const [emailAmount,setEmailAmount]=useState("");
@@ -1683,12 +1676,12 @@ function AdminRequests({ requests, setRequests, blockedDates, setBlockedDates, f
 
   async function confirm(r){
     await sb.updateRequest(r.id,"confirmed");
-    // Exclude the check-out date (includeEnd=false) — the guest leaves that morning,
-    // so it's free for the next check-in and shouldn't be blocked.
-    const next=[...new Set([...blockedDates,...dateRange(r.check_in,r.check_out,false)])];
-    setBlockedDates(next); await sb.setSetting("blocked_dates",next);
+    // Add the booking's nights to booked_dates (red). Check-out morning stays free.
+    const nights=dateRange(r.check_in,r.check_out,false);
+    const next=[...new Set([...bookedDates,...nights])];
+    setBookedDates(next); await sb.setSetting("booked_dates",next);
     setRequests(prev=>prev.map(req=>req.id===r.id?{...req,status:"confirmed"}:req));
-    flashSave("Confirmed & dates blocked ✓");
+    flashSave("Confirmed & dates booked ✓");
   }
 
   async function togglePaid(r){
@@ -1712,8 +1705,15 @@ function AdminRequests({ requests, setRequests, blockedDates, setBlockedDates, f
   }
   async function decline(id){
     await sb.updateRequest(id,"declined");
+    // Free up this booking's dates (remove from booked_dates)
+    const r=requests.find(x=>x.id===id);
+    if(r&&r.check_in&&r.check_out){
+      const nights=new Set(dateRange(r.check_in,r.check_out,false));
+      const next=bookedDates.filter(d=>!nights.has(d));
+      setBookedDates(next); await sb.setSetting("booked_dates",next);
+    }
     setRequests(prev=>prev.map(r=>r.id===id?{...r,status:"declined"}:r));
-    flashSave("Booking declined ✓");
+    flashSave("Booking declined & dates freed ✓");
   }
 
   const filtered=requests.filter(r=>filter==="all"||r.status===filter);
@@ -2717,7 +2717,7 @@ function AdminIcalSync({ blockedDates, setBlockedDates, airbnbDates, setAirbnbDa
 
 // ─── ADMIN VIEW ───────────────────────────────────────────────────────────────
 
-function AdminView({ blockedDates, setBlockedDates, ownerDates, setOwnerDates, peakDates, setPeakDates, pricing, setPricing, info, setInfo, showPricing, setShowPricing, photos, setPhotos, tips, setTips, textBlocks, setTextBlocks, airbnbDates, setAirbnbDates, airbnbBookings, setAirbnbBookings, costs, setCosts, guestbookEntries, setGuestbookEntries, requests, setRequests, onLogout }) {
+function AdminView({ blockedDates, setBlockedDates, bookedDates, setBookedDates, ownerDates, setOwnerDates, peakDates, setPeakDates, pricing, setPricing, info, setInfo, showPricing, setShowPricing, photos, setPhotos, tips, setTips, textBlocks, setTextBlocks, airbnbDates, setAirbnbDates, airbnbBookings, setAirbnbBookings, costs, setCosts, guestbookEntries, setGuestbookEntries, requests, setRequests, onLogout }) {
   const [tab,setTab]=useState("calendar");
   const [saved,setSaved]=useState("");
   const [sidebarOpen,setSidebarOpen]=useState(false);
@@ -2754,8 +2754,8 @@ function AdminView({ blockedDates, setBlockedDates, ownerDates, setOwnerDates, p
           </div>
         </header>
 
-        {tab==="calendar"&&<AdminCalendar blockedDates={blockedDates} setBlockedDates={setBlockedDates} ownerDates={ownerDates} setOwnerDates={setOwnerDates} airbnbDates={airbnbDates} setAirbnbDates={setAirbnbDates} peakDates={peakDates} setPeakDates={setPeakDates} requests={requests} flashSave={flashSave}/>}
-        {tab==="requests"&&<AdminRequests requests={requests} setRequests={setRequests} blockedDates={blockedDates} setBlockedDates={setBlockedDates} flashSave={flashSave}/>}
+        {tab==="calendar"&&<AdminCalendar blockedDates={blockedDates} setBlockedDates={setBlockedDates} ownerDates={ownerDates} setOwnerDates={setOwnerDates} airbnbDates={airbnbDates} setAirbnbDates={setAirbnbDates} peakDates={peakDates} setPeakDates={setPeakDates} bookedDates={bookedDates} requests={requests} flashSave={flashSave}/>}
+        {tab==="requests"&&<AdminRequests requests={requests} setRequests={setRequests} blockedDates={blockedDates} setBlockedDates={setBlockedDates} bookedDates={bookedDates} setBookedDates={setBookedDates} flashSave={flashSave}/>}
         {tab==="photos"&&<AdminPhotos photos={photos} setPhotos={setPhotos} flashSave={flashSave}/>}
         {tab==="tips"&&<AdminAngelEdit tips={tips} setTips={setTips} flashSave={flashSave}/>}
         {tab==="revenue"&&<AdminAnalytics requests={requests} airbnbBookings={airbnbBookings} costs={costs} setCosts={setCosts} flashSave={flashSave}/>}
@@ -2838,6 +2838,7 @@ export default function App() {
   const [blockedDates,setBlockedDates]=useState([]);
   const [ownerDates,setOwnerDates]=useState([]);
   const [airbnbDates,setAirbnbDates]=useState([]);
+  const [bookedDates,setBookedDates]=useState([]);
   const [airbnbBookings,setAirbnbBookings]=useState([]);
   const [peakDates,setPeakDates]=useState([]);
   const [costs,setCosts]=useState([]);
@@ -2855,9 +2856,9 @@ export default function App() {
     // ── Phase 1: load lightweight critical data, then show the site immediately ──
     async function loadCore(){
       try{
-        const [b,od,p,i,sp,abd,abb,pk]=await Promise.all([
+        const [b,od,p,i,sp,abd,abb,pk,bkd]=await Promise.all([
           sb.getSetting("blocked_dates"),sb.getSetting("owner_dates"),sb.getSetting("pricing"),sb.getSetting("info"),
-          sb.getSetting("show_pricing"),sb.getSetting("airbnb_dates"),sb.getSetting("airbnb_bookings"),sb.getSetting("peak_dates"),
+          sb.getSetting("show_pricing"),sb.getSetting("airbnb_dates"),sb.getSetting("airbnb_bookings"),sb.getSetting("peak_dates"),sb.getSetting("booked_dates"),
         ]);
         if(b) setBlockedDates(b);
         if(od) setOwnerDates(od);
@@ -2877,6 +2878,7 @@ export default function App() {
         if(abd) setAirbnbDates(abd);
         if(abb) setAirbnbBookings(abb);
         if(pk) setPeakDates(pk);
+        if(bkd) setBookedDates(bkd);
       }catch(e){
         console.error("Core load error:", e);
       }finally{
@@ -2907,7 +2909,29 @@ export default function App() {
 
   async function loadRequests(){
     const reqs = await sb.getRequests();
-    if(reqs) setRequests(reqs);
+    if(reqs){
+      setRequests(reqs);
+      // ── Keep booking dates and manual blocks in SEPARATE lists ──
+      // booked_dates = confirmed booking nights (red, shown to guests too)
+      // blocked_dates = manual "not available" only (grey)
+      const bookedNights=[...new Set(
+        reqs.filter(r=>r.status==="confirmed").flatMap(r=>dateRange(r.check_in,r.check_out,false))
+      )];
+      const bookedSet=new Set(bookedNights);
+      // Sync booked_dates if it drifted from the confirmed bookings
+      const bookedChanged = bookedNights.length!==bookedDates.length || bookedNights.some(d=>!bookedDates.includes(d));
+      if(bookedChanged){
+        setBookedDates(bookedNights);
+        await sb.setSetting("booked_dates",bookedNights);
+      }
+      // Remove any booking nights that are still sitting in blocked_dates (legacy mix),
+      // but KEEP dates the host has deliberately marked as manual "not available".
+      const cleanedBlocked=blockedDates.filter(d=>!bookedSet.has(d));
+      if(cleanedBlocked.length!==blockedDates.length){
+        setBlockedDates(cleanedBlocked);
+        await sb.setSetting("blocked_dates",cleanedBlocked);
+      }
+    }
   }
 
   async function addRequest(req){
@@ -2940,12 +2964,12 @@ export default function App() {
           <GuestNav activeTab={guestTab} setTab={setGuestTab} showPricing={showPricing}/>
           <CookieBanner/>
           {guestTab==="home"&&<GuestHome info={info} photos={photos} setTab={setGuestTab} tips={tips}/>}
-          {guestTab==="availability"&&<GuestAvailability blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} setTab={setGuestTab}/>}
+          {guestTab==="availability"&&<GuestAvailability blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} bookedDates={bookedDates} setTab={setGuestTab}/>}
           {guestTab==="pricing"&&showPricing&&<GuestPricing pricing={pricing}/>}
           {guestTab==="about"&&<GuestAbout info={info} textBlocks={textBlocks}/>}
           {guestTab==="privacy"&&<GuestPrivacy info={info}/>}
           {guestTab==="guestbook"&&<GuestGuestbook entries={guestbookEntries}/>}
-          {guestTab==="book"&&<GuestBook blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} pricing={pricing} onSubmitRequest={addRequest}/>}
+          {guestTab==="book"&&<GuestBook blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} bookedDates={bookedDates} pricing={pricing} onSubmitRequest={addRequest}/>}
           <GuestFooter info={info} setTab={setGuestTab}/>
         </div>
       )}
@@ -2954,6 +2978,7 @@ export default function App() {
         <AdminView
           blockedDates={blockedDates} setBlockedDates={setBlockedDates}
           ownerDates={ownerDates} setOwnerDates={setOwnerDates}
+          bookedDates={bookedDates} setBookedDates={setBookedDates}
           peakDates={peakDates} setPeakDates={setPeakDates}
           pricing={pricing} setPricing={setPricing}
           info={info} setInfo={setInfo}
