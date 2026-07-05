@@ -18,11 +18,16 @@ const sb = {
   },
 
   async setSetting(key, value) {
-    await fetch(`/api/settings?key=${key}`, {
+    const r = await fetch(`/api/settings?key=${key}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-admin-token": _adminToken },
       body: JSON.stringify({ value })
     });
+    if (!r.ok) {
+      const detail = await r.text().catch(()=> "");
+      throw new Error(`Save failed (${r.status}): ${detail||"could not reach server"}`);
+    }
+    return true;
   },
 
   async getRequests() {
@@ -1086,11 +1091,15 @@ function AdminGuestbook({ entries, setEntries, flashSave }) {
   async function addEntry() {
     if (!form.name || !form.story) return;
     const next = [...(entries||[]), { ...form, id: Date.now() }];
-    setEntries(next);
-    await sb.setSetting("guestbook", next);
-    setShowAdd(false);
-    setForm({ name: "", date: new Date().toISOString().slice(0,10), story: "", nights: "", source: "tcf", rating: 5 });
-    flashSave("Guestbook entry added ✓");
+    try {
+      await sb.setSetting("guestbook", next);
+      setEntries(next);
+      setShowAdd(false);
+      setForm({ name: "", date: new Date().toISOString().slice(0,10), story: "", nights: "", source: "tcf", rating: 5 });
+      flashSave("Guestbook entry added ✓");
+    } catch(e) {
+      alert("Could not save the review — please make sure you're still logged in, then try again.\n\n"+e.message);
+    }
   }
 
   async function removeEntry(id) {
