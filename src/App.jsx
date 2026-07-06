@@ -287,10 +287,9 @@ function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], peakDates=[], b
   function getState(iso){
     const d=new Date(iso), todayISO=today.toISOString().slice(0,10);
     if(airbnbSet.has(iso)) return "airbnb";
-    // Manual overrides win over a booking's own colour (booking + revenue stay intact):
-    if(ownerSet.has(iso)) return "owner";       // Vincent's stay (yellow)
-    if(blockedSet.has(iso)) return "blocked";   // Not available (grey)
+    if(ownerSet.has(iso)) return "owner";       // Vincent's stay (yellow) — top override
     if(bookedSet.has(iso)) return "booked";     // Confirmed booking (red)
+    if(blockedSet.has(iso)) return "blocked";   // Not available (grey) — manual block
     if(d<new Date(todayISO)) return "past";
     if(iso===selectedStart||iso===selectedEnd) return "selected";
     if(selectedStart&&selectedEnd&&iso>selectedStart&&iso<selectedEnd) return "range";
@@ -2920,25 +2919,20 @@ export default function App() {
     const reqs = await sb.getRequests();
     if(reqs){
       setRequests(reqs);
-      // ── Keep booking dates and manual blocks in SEPARATE lists ──
-      // booked_dates = confirmed booking nights (red, shown to guests too)
-      // blocked_dates = manual "not available" only (grey)
+      // Rebuild booked_dates from confirmed bookings so the calendar shows them red.
+      // This ONLY ever ADDS booking nights — it never removes anything from blocked_dates,
+      // so your manual "not available" marks are always preserved.
       const bookedNights=[...new Set(
         reqs.filter(r=>r.status==="confirmed").flatMap(r=>dateRange(r.check_in,r.check_out,false))
       )];
-      const bookedSet=new Set(bookedNights);
-      // Sync booked_dates if it drifted from the confirmed bookings
       const bookedChanged = bookedNights.length!==bookedDates.length || bookedNights.some(d=>!bookedDates.includes(d));
       if(bookedChanged){
-        setBookedDates(bookedNights);
-        await sb.setSetting("booked_dates",bookedNights);
-      }
-      // Remove any booking nights that are still sitting in blocked_dates (legacy mix),
-      // but KEEP dates the host has deliberately marked as manual "not available".
-      const cleanedBlocked=blockedDates.filter(d=>!bookedSet.has(d));
-      if(cleanedBlocked.length!==blockedDates.length){
-        setBlockedDates(cleanedBlocked);
-        await sb.setSetting("blocked_dates",cleanedBlocked);
+        try{
+          await sb.setSetting("booked_dates",bookedNights);
+          setBookedDates(bookedNights);
+        }catch(e){
+          console.error("Could not sync booked_dates (data left intact):", e.message);
+        }
       }
     }
   }
