@@ -288,8 +288,8 @@ function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], peakDates=[], b
     const d=new Date(iso), todayISO=today.toISOString().slice(0,10);
     if(airbnbSet.has(iso)) return "airbnb";
     if(ownerSet.has(iso)) return "owner";       // Vincent's stay (yellow) — top override
+    if(blockedSet.has(iso)) return "blocked";   // Not available (grey) — manual override, can sit on top of a booking
     if(bookedSet.has(iso)) return "booked";     // Confirmed booking (red)
-    if(blockedSet.has(iso)) return "blocked";   // Not available (grey) — manual block
     if(d<new Date(todayISO)) return "past";
     if(iso===selectedStart||iso===selectedEnd) return "selected";
     if(selectedStart&&selectedEnd&&iso>selectedStart&&iso<selectedEnd) return "range";
@@ -344,8 +344,8 @@ function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], peakDates=[], b
           const dateSeason = peakSet.has(iso) ? "peak" : getSeason(viewMonth);
           const isManualPeak = peakSet.has(iso);
           const showMark = showSeasonMarks && (state==="free"||state==="selected"||state==="range"||state==="hover");
-          const bg=state==="airbnb"?"#d4edda":state==="booked"?"#ffdad5":state==="blocked"?"#e0e0e0":state==="owner"?"#fff3cd":state==="past"?"transparent":state==="selected"?C.secondary:state==="range"||state==="hover"?"#dfe0ff":isWknd?C.surfaceContainerLow:C.surfaceContainerLowest;
-          const color=state==="airbnb"?"#155724":state==="booked"?"#930006":state==="blocked"?"#5a5a5a":state==="owner"?"#856404":state==="past"?"#c0b8b0":state==="selected"?"white":C.onSurface;
+          const bg=state==="airbnb"?"#d4edda":state==="booked"?"#ffdad5":state==="blocked"?"#c9ccd4":state==="owner"?"#fff3cd":state==="past"?"transparent":state==="selected"?C.secondary:state==="range"||state==="hover"?"#dfe0ff":isWknd?C.surfaceContainerLow:C.surfaceContainerLowest;
+          const color=state==="airbnb"?"#155724":state==="booked"?"#930006":state==="blocked"?"#33363f":state==="owner"?"#856404":state==="past"?"#c0b8b0":state==="selected"?"white":C.onSurface;
           const fw=state==="selected"?"700":"400";
           return (
             <div key={iso}
@@ -362,14 +362,14 @@ function Calendar({ blockedDates, ownerDates=[], airbnbDates=[], peakDates=[], b
               {day}
               {showMark&&dateSeason==="peak"&&<div title={isManualPeak?"Peak (event date)":"Peak season"} style={{position:"absolute",top:"2px",right:"3px",fontSize:"0.5rem",fontWeight:"800",color:state==="selected"?"#ffe0b3":"#c77800",lineHeight:1}}>{isManualPeak?"★":"£"}</div>}
               {state==="booked"&&<div style={{position:"absolute",bottom:"2px",left:"50%",transform:"translateX(-50%)",width:"4px",height:"4px",borderRadius:"50%",background:"#930006"}}/>}
-              {state==="blocked"&&<div style={{position:"absolute",bottom:"2px",left:"50%",transform:"translateX(-50%)",width:"4px",height:"4px",borderRadius:"50%",background:"#5a5a5a"}}/>}
+              {state==="blocked"&&<div style={{position:"absolute",bottom:"2px",left:"50%",transform:"translateX(-50%)",width:"4px",height:"4px",borderRadius:"50%",background:"#33363f"}}/>}
               {state==="owner"&&<div style={{position:"absolute",bottom:"2px",left:"50%",transform:"translateX(-50%)",width:"4px",height:"4px",borderRadius:"50%",background:"#856404"}}/>}
             </div>
           );
         })}
       </div>
       <div style={{display:"flex",gap:"12px",marginTop:"0.75rem",flexWrap:"wrap"}}>
-        {[[C.surfaceContainerLowest,"Available",C.outlineVariant],["#ffdad5","Booked","#ffb4aa"],["#e0e0e0","Not available","#bbb"],["#fff3cd","Vincent's stay","#ffc107"],["#dfe0ff","Selected","#bcc2ff"]].map(([bg,label,border])=>(
+        {[[C.surfaceContainerLowest,"Available",C.outlineVariant],["#ffdad5","Booked","#ffb4aa"],["#c9ccd4","Not available","#9a9fae"],["#fff3cd","Vincent's stay","#ffc107"],["#dfe0ff","Selected","#bcc2ff"]].map(([bg,label,border])=>(
           <div key={label} style={{display:"flex",alignItems:"center",gap:"5px",fontSize:"0.7rem",color:C.onSurfaceVariant}}>
             <div style={{width:"10px",height:"10px",borderRadius:"2px",background:bg,border:`1px solid ${border}`}}/>
             <span>{label}</span>
@@ -1549,26 +1549,6 @@ function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDate
 
   // Remove orphaned check-out dates: dates in blocked_dates that are the check-out
   // day of a confirmed booking (so not an actual booked night) and not owner/airbnb.
-  async function cleanupCheckoutDates(){
-    const checkoutDates=new Set(
-      requests.filter(r=>r.status==="confirmed").map(r=>r.check_out)
-    );
-    const bookedNights=new Set(
-      requests.filter(r=>r.status==="confirmed").flatMap(r=>dateRange(r.check_in,r.check_out,false))
-    );
-    const ownerSet=new Set(ownerDates), airbnbSet=new Set(airbnbDates);
-    // A date is orphaned if it's a checkout date, currently blocked, but not an actual
-    // booked night, not a Vincent stay, and not an Airbnb date.
-    const toRemove=blockedDates.filter(d=>
-      checkoutDates.has(d) && !bookedNights.has(d) && !ownerSet.has(d) && !airbnbSet.has(d)
-    );
-    if(toRemove.length===0){ flashSave("No check-out dates to clean ✓"); return; }
-    const removeSet=new Set(toRemove);
-    const next=blockedDates.filter(d=>!removeSet.has(d));
-    setBlockedDates(next); await sb.setSetting("blocked_dates",next);
-    flashSave(`Cleared ${toRemove.length} check-out date${toRemove.length>1?"s":""} ✓`);
-  }
-
   // Group blocked dates
   function groupDates(dates){
     if(!dates.length) return [];
@@ -1636,12 +1616,7 @@ function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDate
 
           {/* Blocked periods */}
           <div className="card" style={{padding:"24px",flex:1}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px",gap:"8px",flexWrap:"wrap"}}>
-              <h3 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",fontSize:"1rem"}}>Not available</h3>
-              <button onClick={cleanupCheckoutDates} className="btn-ghost" style={{fontSize:"0.72rem",padding:"4px 10px"}} title="Free up check-out dates left blocked by past bookings">
-                Clean check-out dates
-              </button>
-            </div>
+            <h3 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",fontSize:"1rem",marginBottom:"16px"}}>Not available</h3>
             {groupDates(blockedDates).length===0?<p style={{fontSize:"0.85rem",color:C.onSurfaceVariant}}>No dates blocked.</p>:(
               <div style={{maxHeight:"240px",overflowY:"auto",display:"flex",flexDirection:"column",gap:"4px"}}>
                 {groupDates(blockedDates).map(([s,e],i)=>(
