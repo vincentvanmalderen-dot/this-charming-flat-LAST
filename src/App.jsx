@@ -1500,9 +1500,14 @@ function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDate
     if(!selStart) return;
     const end=selEnd||selStart; // support single date
     const next=[...new Set([...blockedDates,...dateRange(selStart,end)])];
-    setBlockedDates(next); await persist(next);
-    setSelStart(null);setSelEnd(null);setNote("");
-    flashSave("Dates blocked ✓");
+    try{
+      await persist(next);
+      setBlockedDates(next);
+      setSelStart(null);setSelEnd(null);setNote("");
+      flashSave("Dates blocked ✓");
+    }catch(e){
+      alert("Could not save — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
   async function unblockDates(){
     if(!selStart) return;
@@ -1511,11 +1516,25 @@ function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDate
     const next=blockedDates.filter(d=>!range.has(d));
     const nextOwner=ownerDates.filter(d=>!range.has(d));
     const nextAirbnb=airbnbDates.filter(d=>!range.has(d));
-    setBlockedDates(next); await persist(next);
-    setOwnerDates(nextOwner); await sb.setSetting("owner_dates",nextOwner);
-    setAirbnbDates(nextAirbnb); await sb.setSetting("airbnb_dates",nextAirbnb);
-    setSelStart(null);setSelEnd(null);
-    flashSave("Dates unblocked ✓");
+    try{
+      await persist(next);
+      await sb.setSetting("owner_dates",nextOwner);
+      await sb.setSetting("airbnb_dates",nextAirbnb);
+      setBlockedDates(next);
+      setOwnerDates(nextOwner);
+      setAirbnbDates(nextAirbnb);
+      setSelStart(null);setSelEnd(null);
+      // If any selected date belongs to a still-confirmed booking, unblocking here is
+      // only cosmetic — it will revert to red next admin login. Point to the real fix.
+      const stillBooked=[...range].some(d=>bookedDates.includes(d));
+      if(stillBooked){
+        flashSave("Dates unblocked — but a booking is still confirmed for part of this range. Decline it in Bookings to fully free it ⚠️");
+      } else {
+        flashSave("Dates unblocked ✓");
+      }
+    }catch(e){
+      alert("Could not save — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
 
   async function blockOwner(){
@@ -1523,9 +1542,14 @@ function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDate
     const end=selEnd||selStart;
     const range=dateRange(selStart,end);
     const next=[...new Set([...ownerDates,...range])];
-    setOwnerDates(next); await sb.setSetting("owner_dates",next);
-    setSelStart(null);setSelEnd(null);setNote("");
-    flashSave("Vincent's stay blocked ✓");
+    try{
+      await sb.setSetting("owner_dates",next);
+      setOwnerDates(next);
+      setSelStart(null);setSelEnd(null);setNote("");
+      flashSave("Vincent's stay blocked ✓");
+    }catch(e){
+      alert("Could not save — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
 
   async function markPeak(){
@@ -1533,18 +1557,28 @@ function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDate
     const end=selEnd||selStart;
     const range=dateRange(selStart,end);
     const next=[...new Set([...(peakDates||[]),...range])];
-    setPeakDates(next); await sb.setSetting("peak_dates",next);
-    setSelStart(null);setSelEnd(null);setNote("");
-    flashSave("Marked as peak pricing ✓");
+    try{
+      await sb.setSetting("peak_dates",next);
+      setPeakDates(next);
+      setSelStart(null);setSelEnd(null);setNote("");
+      flashSave("Marked as peak pricing ✓");
+    }catch(e){
+      alert("Could not save — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
   async function unmarkPeak(){
     if(!selStart) return;
     const end=selEnd||selStart;
     const range=new Set(dateRange(selStart,end));
     const next=(peakDates||[]).filter(d=>!range.has(d));
-    setPeakDates(next); await sb.setSetting("peak_dates",next);
-    setSelStart(null);setSelEnd(null);
-    flashSave("Peak pricing removed ✓");
+    try{
+      await sb.setSetting("peak_dates",next);
+      setPeakDates(next);
+      setSelStart(null);setSelEnd(null);
+      flashSave("Peak pricing removed ✓");
+    }catch(e){
+      alert("Could not save — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
 
   // Remove orphaned check-out dates: dates in blocked_dates that are the check-out
@@ -1658,13 +1692,18 @@ function AdminRequests({ requests, setRequests, blockedDates, setBlockedDates, b
   }
 
   async function confirm(r){
-    await sb.updateRequest(r.id,"confirmed");
     // Add the booking's nights to booked_dates (red). Check-out morning stays free.
     const nights=dateRange(r.check_in,r.check_out,false);
     const next=[...new Set([...bookedDates,...nights])];
-    setBookedDates(next); await sb.setSetting("booked_dates",next);
-    setRequests(prev=>prev.map(req=>req.id===r.id?{...req,status:"confirmed"}:req));
-    flashSave("Confirmed & dates booked ✓");
+    try{
+      await sb.updateRequest(r.id,"confirmed");
+      await sb.setSetting("booked_dates",next);
+      setBookedDates(next);
+      setRequests(prev=>prev.map(req=>req.id===r.id?{...req,status:"confirmed"}:req));
+      flashSave("Confirmed & dates booked ✓");
+    }catch(e){
+      alert("Could not confirm this booking — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
 
   async function togglePaid(r){
@@ -1687,16 +1726,21 @@ function AdminRequests({ requests, setRequests, blockedDates, setBlockedDates, b
     flashSave("Amount updated ✓");
   }
   async function decline(id){
-    await sb.updateRequest(id,"declined");
-    // Free up this booking's dates (remove from booked_dates)
     const r=requests.find(x=>x.id===id);
-    if(r&&r.check_in&&r.check_out){
-      const nights=new Set(dateRange(r.check_in,r.check_out,false));
-      const next=bookedDates.filter(d=>!nights.has(d));
-      setBookedDates(next); await sb.setSetting("booked_dates",next);
+    const next = (r&&r.check_in&&r.check_out)
+      ? bookedDates.filter(d=>!new Set(dateRange(r.check_in,r.check_out,false)).has(d))
+      : bookedDates;
+    try{
+      await sb.updateRequest(id,"declined");
+      if(r&&r.check_in&&r.check_out){
+        await sb.setSetting("booked_dates",next);
+        setBookedDates(next);
+      }
+      setRequests(prev=>prev.map(r=>r.id===id?{...r,status:"declined"}:r));
+      flashSave("Booking declined & dates freed ✓");
+    }catch(e){
+      alert("Could not decline this booking — please check you're still logged in, then try again.\n\n"+e.message);
     }
-    setRequests(prev=>prev.map(r=>r.id===id?{...r,status:"declined"}:r));
-    flashSave("Booking declined & dates freed ✓");
   }
 
   const filtered=requests.filter(r=>filter==="all"||r.status===filter);
@@ -1877,6 +1921,14 @@ function AdminRequests({ requests, setRequests, blockedDates, setBlockedDates, b
               <div style={{display:"flex",gap:"8px"}}>
                 <button className="btn-secondary" onClick={()=>confirm(r)} style={{fontSize:"0.85rem",padding:"8px 18px",background:"#1a6a1a"}}>Confirm & block dates</button>
                 <button className="btn-ghost" onClick={()=>decline(r.id)} style={{color:C.error,borderColor:C.error,fontSize:"0.85rem"}}>Decline</button>
+              </div>
+            )}
+            {r.status==="confirmed"&&(
+              <div style={{display:"flex",gap:"8px"}}>
+                <button className="btn-ghost" onClick={()=>{ if(window.confirm(`Cancel ${r.name}'s confirmed booking (${formatDate(r.check_in)} – ${formatDate(r.check_out)})? This frees the dates back to available.`)) decline(r.id); }}
+                  style={{color:C.error,borderColor:C.error,fontSize:"0.85rem",padding:"8px 18px"}}>
+                  Cancel booking
+                </button>
               </div>
             )}
               {/* Amount edit + Paid toggle + Actions row */}
