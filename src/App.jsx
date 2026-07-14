@@ -253,6 +253,7 @@ const globalCSS = `
     .admin-menu-btn { display: inline-flex !important; }
   }
   @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+  @keyframes shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
 `;
 
 // ─── ICON ─────────────────────────────────────────────────────────────────────
@@ -566,7 +567,19 @@ function GuestPhotoGallery({ photos }) {
 
 // ─── GUEST: HOME ──────────────────────────────────────────────────────────────
 
-function GuestHome({ info, photos, setTab, tips }) {
+function SkeletonBlock({ height="160px", radius="12px", style={} }) {
+  return (
+    <div style={{
+      height, borderRadius: radius,
+      background: `linear-gradient(90deg, ${C.surfaceContainerLow} 0%, ${C.surfaceContainerHigh} 50%, ${C.surfaceContainerLow} 100%)`,
+      backgroundSize: "800px 100%",
+      animation: "shimmer 1.4s ease-in-out infinite",
+      ...style
+    }}/>
+  );
+}
+
+function GuestHome({ info, photos, setTab, tips, extrasLoading=false }) {
   return (
     <div className="fade-in">
       {/* Hero */}
@@ -600,11 +613,17 @@ function GuestHome({ info, photos, setTab, tips }) {
       </section>
 
       {/* Photo gallery */}
-      {photos&&photos.length>0&&(
+      {extrasLoading ? (
+        <section style={{padding:"0 clamp(20px,5vw,48px) 80px",maxWidth:"1280px",margin:"0 auto"}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:"12px"}}>
+            {[0,1,2,3].map(i=><SkeletonBlock key={i} height="200px"/>)}
+          </div>
+        </section>
+      ) : (photos&&photos.length>0&&(
         <section style={{padding:"0 clamp(20px,5vw,48px) 80px",maxWidth:"1280px",margin:"0 auto"}}>
           <GuestPhotoGallery photos={photos}/>
         </section>
-      )}
+      ))}
 
       {/* Local tips */}
       <section style={{padding:"0 clamp(20px,5vw,48px) 80px",maxWidth:"1280px",margin:"0 auto"}}>
@@ -614,6 +633,11 @@ function GuestHome({ info, photos, setTab, tips }) {
           </h2>
           <p style={{color:C.onSurfaceVariant}}>Our hand-picked neighbourhood favourites.</p>
         </div>
+        {extrasLoading ? (
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,260px))",gap:"16px",justifyContent:"start"}}>
+            {[0,1,2,3,4,5].map(i=><SkeletonBlock key={i} height="260px"/>)}
+          </div>
+        ) : (
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,260px))",gap:"16px",justifyContent:"start"}}>
           {(tips&&tips.length>0?tips:DEFAULT_TIPS).map((tip,i)=>{
             const iconName = CATEGORY_ICONS[tip.category]||"place";
@@ -648,6 +672,7 @@ function GuestHome({ info, photos, setTab, tips }) {
             );
           })}
         </div>
+        )}
       </section>
     </div>
   );
@@ -2882,7 +2907,7 @@ export default function App() {
   const [info,setInfo]=useState(DEFAULT_INFO);
   const [showPricing,setShowPricing]=useState(true);
   const [photos,setPhotos]=useState([]);
-  const [photosLoading,setPhotosLoading]=useState(true);
+  const [extrasLoading,setExtrasLoading]=useState(true);
   const [tips,setTips]=useState([]);
   const [textBlocks,setTextBlocks]=useState([]);
   const [requests,setRequests]=useState([]);
@@ -2935,7 +2960,7 @@ export default function App() {
       }catch(e){
         console.error("Extras load error:", e);
       }finally{
-        setPhotosLoading(false);
+        setExtrasLoading(false);
       }
     }
     loadCore();
@@ -2993,7 +3018,7 @@ export default function App() {
         <div style={{background:C.surface,minHeight:"100vh"}}>
           <GuestNav activeTab={guestTab} setTab={setGuestTab} showPricing={showPricing}/>
           <CookieBanner/>
-          {guestTab==="home"&&<GuestHome info={info} photos={photos} setTab={setGuestTab} tips={tips}/>}
+          {guestTab==="home"&&<GuestHome info={info} photos={photos} setTab={setGuestTab} tips={tips} extrasLoading={extrasLoading}/>}
           {guestTab==="availability"&&<GuestAvailability blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} bookedDates={bookedDates} setTab={setGuestTab}/>}
           {guestTab==="pricing"&&showPricing&&<GuestPricing pricing={pricing}/>}
           {guestTab==="about"&&<GuestAbout info={info} textBlocks={textBlocks}/>}
