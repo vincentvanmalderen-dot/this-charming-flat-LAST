@@ -448,6 +448,7 @@ function GuestNav({ activeTab, setTab, showPricing }) {
     {id:"availability",label:"Availability"},
     ...(showPricing?[{id:"pricing",label:"Pricing"}]:[]),
     {id:"about",label:"About the Flat"},
+    {id:"guides",label:"Field Guides"},
     {id:"guestbook",label:"Guestbook"},
     {id:"book",label:"Book now (friends)",cta:true},
     {id:"airbnb",label:"Book now (Airbnb)",cta:true,external:"https://www.airbnb.co.uk/h/thischarmingflat1"},
@@ -1254,6 +1255,45 @@ function AdminGuestbook({ entries, setEntries, flashSave }) {
 
 // ─── GUEST: GUESTBOOK ────────────────────────────────────────────────────────
 
+function GuestFieldGuides({ guides }) {
+  const all = guides || [];
+  return (
+    <div className="fade-in" style={{padding:"120px clamp(20px,5vw,48px) 80px",maxWidth:"860px",margin:"0 auto"}}>
+      <div style={{marginBottom:"40px"}}>
+        <span style={{display:"inline-flex",alignItems:"center",gap:"8px",background:C.primaryFixed,color:C.onPrimaryFixed,padding:"4px 16px",borderRadius:"999px",fontSize:"0.72rem",fontWeight:"800",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"16px"}}>
+          <span style={{width:"8px",height:"8px",borderRadius:"50%",background:C.primary}}/>
+          Field Guides
+        </span>
+        <h1 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:"clamp(2rem,5vw,3rem)",fontWeight:"800",letterSpacing:"-0.02em",marginBottom:"12px"}}>Guides worth taking with you</h1>
+        <p style={{color:C.onSurfaceVariant,fontSize:"1rem",lineHeight:"1.7",maxWidth:"560px"}}>Downloadable PDFs curated by Elina & Vincent — pub crawls, playlists, and other charming detours around London.</p>
+      </div>
+
+      {all.length===0
+        ? <div style={{textAlign:"center",color:C.onSurfaceVariant,padding:"60px 0",fontSize:"1rem"}}>
+            <div style={{fontSize:"2rem",marginBottom:"16px"}}>🗺️</div>
+            <p>No field guides yet — check back soon!</p>
+          </div>
+        : all.map((g,i)=>(
+          <div key={g.id||i} className="card" style={{padding:"0",marginBottom:"20px",overflow:"hidden",display:"flex",flexWrap:"wrap"}}>
+            <div style={{width:"140px",minHeight:"140px",flexShrink:0,background:g.cover?`url(${g.cover}) center/cover`:`linear-gradient(135deg,${C.secondary},${C.primary})`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              {!g.cover&&<Icon name="menu_book" size={40} style={{color:"white"}}/>}
+            </div>
+            <div style={{flex:1,minWidth:"220px",padding:"24px 28px",display:"flex",flexDirection:"column",justifyContent:"center"}}>
+              <h3 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",fontSize:"1.15rem",marginBottom:"6px"}}>{g.title}</h3>
+              {g.description&&<p style={{fontSize:"0.88rem",color:C.onSurfaceVariant,lineHeight:"1.6",marginBottom:"14px"}}>{g.description}</p>}
+              {g.driveUrl&&(
+                <a href={g.driveUrl} target="_blank" rel="noopener noreferrer" className="btn-primary"
+                  style={{display:"inline-flex",alignItems:"center",gap:"8px",width:"fit-content",fontSize:"0.85rem",padding:"10px 20px",textDecoration:"none"}}>
+                  <Icon name="download" size={16}/>Download PDF
+                </a>
+              )}
+            </div>
+          </div>
+        ))}
+    </div>
+  );
+}
+
 function GuestGuestbook({ entries }) {
   const all = entries || [];
   const airbnbEntries = all.filter(e => e.source === "airbnb");
@@ -1453,6 +1493,7 @@ function AdminSidebar({ activeTab, setTab, pendingCount, sidebarOpen, setSidebar
     {id:"requests",icon:"bookmark",label:`Bookings${pendingCount?" ("+pendingCount+")":""}`},
     {id:"photos",icon:"photo_library",label:"Photos"},
     {id:"tips",icon:"location_on",label:"Angel Edit"},
+    {id:"guides",icon:"menu_book",label:"Field Guides"},
     {id:"pricing",icon:"payments",label:"Pricing"},
     {id:"ical",icon:"sync",label:"Airbnb Sync"},
     {id:"revenue",icon:"bar_chart",label:"Revenue"},
@@ -2344,6 +2385,139 @@ function AdminAngelEdit({ tips, setTips, flashSave }) {
 
 
 
+// ─── ADMIN: FIELD GUIDES ──────────────────────────────────────────────────────
+
+function AdminFieldGuides({ guides, setGuides, flashSave }) {
+  const [edit, setEdit] = useState([]);
+
+  useEffect(() => {
+    if (guides) setEdit(JSON.parse(JSON.stringify(guides)));
+  }, [guides]);
+
+  async function save() {
+    try {
+      await sb.setSetting("field_guides", edit);
+      setGuides(edit);
+      flashSave("Field Guides saved ✓");
+    } catch(e) {
+      alert("Could not save — please check you're still logged in, then try again.\n\n"+e.message);
+    }
+  }
+
+  function addGuide() {
+    setEdit(prev => [...prev, { id: Date.now(), title: "", description: "", driveUrl: "", cover: "" }]);
+  }
+  function removeGuide(i) {
+    setEdit(prev => prev.filter((_,idx) => idx !== i));
+  }
+  function updateGuide(i, field, value) {
+    setEdit(prev => prev.map((g,idx) => idx === i ? {...g, [field]: value} : g));
+  }
+
+  return (
+    <div className="slide-in">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"24px",flexWrap:"wrap",gap:"12px"}}>
+        <div>
+          <h2 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",fontSize:"1.3rem"}}>Field Guides</h2>
+          <p style={{fontSize:"0.85rem",color:C.onSurfaceVariant,marginTop:"4px"}}>Downloadable PDF guides — shown between "About the Flat" and "Guestbook" on the guest site.</p>
+        </div>
+        <div style={{display:"flex",gap:"8px"}}>
+          <button onClick={addGuide} className="btn-ghost" style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"0.85rem"}}>
+            <Icon name="add" size={16}/>Add guide
+          </button>
+          <button onClick={save} className="btn-primary" style={{padding:"8px 20px",fontSize:"0.85rem"}}>Save</button>
+        </div>
+      </div>
+
+      <div className="card" style={{padding:"16px 20px",marginBottom:"20px",background:C.surfaceContainerLow,display:"flex",gap:"12px",alignItems:"flex-start"}}>
+        <Icon name="info" size={18} style={{color:C.secondary,flexShrink:0,marginTop:"2px"}}/>
+        <p style={{fontSize:"0.82rem",color:C.onSurfaceVariant,lineHeight:"1.6"}}>
+          Big PDFs (like a 22MB guide) are too large to store directly. Upload the PDF to <strong>Google Drive</strong> instead,
+          right-click it → <strong>Share</strong> → set to "Anyone with the link", copy that link, and paste it below.
+          Guests will click through to view/download it from Drive.
+        </p>
+      </div>
+
+      <div style={{display:"grid",gap:"16px"}}>
+        {edit.map((guide, i) => (
+          <div key={guide.id||i} className="card" style={{padding:"24px",borderLeft:`4px solid ${C.secondary}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"16px",gap:"12px",flexWrap:"wrap"}}>
+              <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
+                <div style={{width:"40px",height:"40px",borderRadius:"50%",background:`${C.secondary}18`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <Icon name="menu_book" size={20} style={{color:C.secondary}}/>
+                </div>
+                <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:"700",fontSize:"1rem",color:guide.title?C.onSurface:C.onSurfaceVariant}}>{guide.title||"New guide"}</span>
+              </div>
+              <button onClick={()=>removeGuide(i)} style={{background:"none",border:`1px solid ${C.error}`,color:C.error,borderRadius:"6px",padding:"6px 10px",cursor:"pointer",fontSize:"0.78rem",fontWeight:"600"}}>Remove</button>
+            </div>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px"}}>
+              <div style={{gridColumn:"span 2"}}>
+                <label style={{display:"block",fontSize:"0.72rem",fontWeight:"700",color:C.onSurfaceVariant,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"5px"}}>Title *</label>
+                <input value={guide.title} onChange={e=>updateGuide(i,"title",e.target.value)}
+                  placeholder="e.g. Many Icebergs Ago — A Morrissey Pub Crawl" className="input-field"/>
+              </div>
+              <div style={{gridColumn:"span 2"}}>
+                <label style={{display:"block",fontSize:"0.72rem",fontWeight:"700",color:C.onSurfaceVariant,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"5px"}}>Description</label>
+                <textarea value={guide.description} onChange={e=>updateGuide(i,"description",e.target.value)}
+                  placeholder="A short blurb for guests..." className="input-field" style={{height:"60px",resize:"vertical"}}/>
+              </div>
+              <div style={{gridColumn:"span 2"}}>
+                <label style={{display:"block",fontSize:"0.72rem",fontWeight:"700",color:C.onSurfaceVariant,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"5px"}}>
+                  <Icon name="link" size={13} style={{color:C.tertiary,marginRight:"4px"}}/> Google Drive link (shared, "Anyone with the link")
+                </label>
+                <input value={guide.driveUrl||""} onChange={e=>updateGuide(i,"driveUrl",e.target.value)}
+                  placeholder="https://drive.google.com/file/d/..." className="input-field" type="url"/>
+              </div>
+              <div style={{gridColumn:"span 2"}}>
+                <label style={{display:"block",fontSize:"0.72rem",fontWeight:"700",color:C.onSurfaceVariant,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"5px"}}>
+                  <Icon name="image" size={13} style={{color:C.primary,marginRight:"4px"}}/> Cover image (optional)
+                </label>
+                <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
+                  {guide.cover&&<img src={guide.cover} alt={guide.title} style={{width:"60px",height:"60px",objectFit:"cover",borderRadius:"8px",flexShrink:0}}/>}
+                  <div style={{flex:1}}>
+                    <input type="file" accept="image/*" onChange={e=>{
+                      const file=e.target.files[0]; if(!file) return;
+                      const reader=new FileReader();
+                      reader.onload=ev=>{
+                        const img=new Image();
+                        img.onload=()=>{
+                          const canvas=document.createElement("canvas");
+                          let w=img.width,h=img.height;
+                          if(w>900){h=Math.round(h*900/w);w=900;}
+                          canvas.width=w;canvas.height=h;
+                          canvas.getContext("2d").drawImage(img,0,0,w,h);
+                          updateGuide(i,"cover",canvas.toDataURL("image/jpeg",0.65));
+                        };
+                        img.src=ev.target.result;
+                      };
+                      reader.readAsDataURL(file);
+                    }} style={{fontSize:"0.82rem",width:"100%"}}/>
+                    {guide.cover&&<button onClick={()=>updateGuide(i,"cover","")} style={{background:"none",border:"none",color:C.error,fontSize:"0.75rem",cursor:"pointer",marginTop:"4px",padding:0}}>Remove cover</button>}
+                  </div>
+                </div>
+                <p style={{fontSize:"0.7rem",color:C.onSurfaceVariant,marginTop:"4px"}}>Shown as a thumbnail next to the guide. Falls back to a book icon if left blank.</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {edit.length === 0 && (
+        <div className="card" style={{padding:"48px",textAlign:"center",color:C.onSurfaceVariant}}>
+          <Icon name="menu_book" size={40} style={{color:C.outlineVariant,marginBottom:"12px"}}/>
+          <p style={{marginBottom:"16px"}}>No field guides yet — add your first one!</p>
+          <button onClick={addGuide} className="btn-primary" style={{padding:"10px 24px",fontSize:"0.9rem"}}>Add a guide</button>
+        </div>
+      )}
+
+      <div style={{marginTop:"20px",display:"flex",justifyContent:"flex-end"}}>
+        <button onClick={save} className="btn-primary" style={{padding:"10px 28px"}}>Save Field Guides</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── ADMIN: ANALYTICS ────────────────────────────────────────────────────────
 
 // Fixed monthly costs
@@ -2777,7 +2951,7 @@ function AdminIcalSync({ blockedDates, setBlockedDates, airbnbDates, setAirbnbDa
 
 // ─── ADMIN VIEW ───────────────────────────────────────────────────────────────
 
-function AdminView({ blockedDates, setBlockedDates, bookedDates, setBookedDates, ownerDates, setOwnerDates, peakDates, setPeakDates, pricing, setPricing, info, setInfo, showPricing, setShowPricing, photos, setPhotos, tips, setTips, textBlocks, setTextBlocks, airbnbDates, setAirbnbDates, airbnbBookings, setAirbnbBookings, costs, setCosts, guestbookEntries, setGuestbookEntries, requests, setRequests, onLogout }) {
+function AdminView({ blockedDates, setBlockedDates, bookedDates, setBookedDates, ownerDates, setOwnerDates, peakDates, setPeakDates, pricing, setPricing, info, setInfo, showPricing, setShowPricing, photos, setPhotos, tips, setTips, textBlocks, setTextBlocks, airbnbDates, setAirbnbDates, airbnbBookings, setAirbnbBookings, costs, setCosts, guestbookEntries, setGuestbookEntries, fieldGuides, setFieldGuides, requests, setRequests, onLogout }) {
   const [tab,setTab]=useState("calendar");
   const [saved,setSaved]=useState("");
   const [sidebarOpen,setSidebarOpen]=useState(false);
@@ -2818,6 +2992,7 @@ function AdminView({ blockedDates, setBlockedDates, bookedDates, setBookedDates,
         {tab==="requests"&&<AdminRequests requests={requests} setRequests={setRequests} blockedDates={blockedDates} setBlockedDates={setBlockedDates} bookedDates={bookedDates} setBookedDates={setBookedDates} flashSave={flashSave}/>}
         {tab==="photos"&&<AdminPhotos photos={photos} setPhotos={setPhotos} flashSave={flashSave}/>}
         {tab==="tips"&&<AdminAngelEdit tips={tips} setTips={setTips} flashSave={flashSave}/>}
+        {tab==="guides"&&<AdminFieldGuides guides={fieldGuides} setGuides={setFieldGuides} flashSave={flashSave}/>}
         {tab==="revenue"&&<AdminAnalytics requests={requests} airbnbBookings={airbnbBookings} costs={costs} setCosts={setCosts} flashSave={flashSave}/>}
         {tab==="pricing"&&<AdminPricing pricing={pricing} setPricing={setPricing} showPricing={showPricing} setShowPricing={setShowPricing} flashSave={flashSave}/>}
         {tab==="ical"&&<AdminIcalSync blockedDates={blockedDates} setBlockedDates={setBlockedDates} airbnbDates={airbnbDates} setAirbnbDates={setAirbnbDates} airbnbBookings={airbnbBookings} setAirbnbBookings={setAirbnbBookings} flashSave={flashSave}/>}
@@ -2872,7 +3047,7 @@ export default function App() {
     // Initialise from the URL path so each tab is deep-linkable
     if(typeof window==="undefined") return "home";
     const path=window.location.pathname.replace(/^\/+|\/+$/g,"").toLowerCase();
-    const valid=["home","availability","pricing","about","guestbook","book","privacy"];
+    const valid=["home","availability","pricing","about","guides","guestbook","book","privacy"];
     return valid.includes(path)?path:"home";
   });
   // Wrap setter so navigation updates the browser URL too
@@ -2888,7 +3063,7 @@ export default function App() {
   useEffect(()=>{
     function onPop(){
       const path=window.location.pathname.replace(/^\/+|\/+$/g,"").toLowerCase();
-      const valid=["home","availability","pricing","about","guestbook","book","privacy"];
+      const valid=["home","availability","pricing","about","guides","guestbook","book","privacy"];
       setGuestTabRaw(valid.includes(path)?path:"home");
     }
     window.addEventListener("popstate",onPop);
@@ -2903,6 +3078,7 @@ export default function App() {
   const [peakDates,setPeakDates]=useState([]);
   const [costs,setCosts]=useState([]);
   const [guestbookEntries,setGuestbookEntries]=useState([]);
+  const [fieldGuides,setFieldGuides]=useState([]);
   const [pricing,setPricing]=useState(DEFAULT_PRICING);
   const [info,setInfo]=useState(DEFAULT_INFO);
   const [showPricing,setShowPricing]=useState(true);
@@ -2948,15 +3124,16 @@ export default function App() {
     // ── Phase 2: load heavier / non-critical data in the background ──
     async function loadExtras(){
       try{
-        const [ph,t,tb,co,gb]=await Promise.all([
+        const [ph,t,tb,co,gb,fg]=await Promise.all([
           sb.getSetting("photos"),sb.getSetting("tips"),sb.getSetting("text_blocks"),
-          sb.getSetting("costs"),sb.getSetting("guestbook"),
+          sb.getSetting("costs"),sb.getSetting("guestbook"),sb.getSetting("field_guides"),
         ]);
         if(ph) setPhotos(ph);
         if(t) setTips(t);
         if(tb) setTextBlocks(tb);
         if(co) setCosts(co);
         if(gb) setGuestbookEntries(gb);
+        if(fg) setFieldGuides(fg);
       }catch(e){
         console.error("Extras load error:", e);
       }finally{
@@ -3023,6 +3200,7 @@ export default function App() {
           {guestTab==="pricing"&&showPricing&&<GuestPricing pricing={pricing}/>}
           {guestTab==="about"&&<GuestAbout info={info} textBlocks={textBlocks}/>}
           {guestTab==="privacy"&&<GuestPrivacy info={info}/>}
+          {guestTab==="guides"&&<GuestFieldGuides guides={fieldGuides}/>}
           {guestTab==="guestbook"&&<GuestGuestbook entries={guestbookEntries}/>}
           {guestTab==="book"&&<GuestBook blockedDates={blockedDates} ownerDates={ownerDates} airbnbDates={airbnbDates} peakDates={peakDates} bookedDates={bookedDates} pricing={pricing} onSubmitRequest={addRequest}/>}
           <GuestFooter info={info} setTab={setGuestTab}/>
@@ -3044,6 +3222,7 @@ export default function App() {
           airbnbDates={airbnbDates} setAirbnbDates={setAirbnbDates} airbnbBookings={airbnbBookings} setAirbnbBookings={setAirbnbBookings}
           costs={costs} setCosts={setCosts}
           guestbookEntries={guestbookEntries} setGuestbookEntries={setGuestbookEntries}
+          fieldGuides={fieldGuides} setFieldGuides={setFieldGuides}
           requests={requests} setRequests={setRequests}
           onLogout={()=>{setIsAdmin(false);setView("guest");sb.clearToken();}}
         />
