@@ -1015,9 +1015,13 @@ function AdminTextBlocks({ textBlocks, setTextBlocks, flashSave }) {
   }, [textBlocks]);
 
   async function save() {
-    setTextBlocks(edit);
-    await sb.setSetting("text_blocks", edit);
-    flashSave("Text blocks saved ✓");
+    try {
+      await sb.setSetting("text_blocks", edit);
+      setTextBlocks(edit);
+      flashSave("Text blocks saved ✓");
+    } catch(e) {
+      alert("Could not save — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
 
   function update(i, field, value) {
@@ -1129,9 +1133,13 @@ function AdminGuestbook({ entries, setEntries, flashSave }) {
 
   async function removeEntry(id) {
     const next = (entries||[]).filter(e => e.id !== id);
-    setEntries(next);
-    await sb.setSetting("guestbook", next);
-    flashSave("Entry removed ✓");
+    try {
+      await sb.setSetting("guestbook", next);
+      setEntries(next);
+      flashSave("Entry removed ✓");
+    } catch(e) {
+      alert("Could not remove — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
 
   const airbnbEntries = (entries||[]).filter(e => e.source === "airbnb");
@@ -1725,8 +1733,13 @@ function AdminCalendar({ blockedDates, setBlockedDates, ownerDates, setOwnerDate
                     <button onClick={async()=>{
                       const range=new Set(dateRange(s,e));
                       const next=blockedDates.filter(d=>!range.has(d));
-                      setBlockedDates(next); await sb.setSetting("blocked_dates",next);
-                      flashSave("Unblocked ✓");
+                      try{
+                        await sb.setSetting("blocked_dates",next);
+                        setBlockedDates(next);
+                        flashSave("Unblocked ✓");
+                      }catch(err){
+                        alert("Could not save — please check you're still logged in, then try again.\n\n"+err.message);
+                      }
                     }} style={{background:"none",border:"none",color:C.error,cursor:"pointer",padding:"2px 6px",fontSize:"0.8rem"}}>✕</button>
                   </div>
                 ))}
@@ -2087,18 +2100,32 @@ function AdminPhotos({ photos, setPhotos, flashSave }) {
         console.error("Failed to process", file.name, err);
       }
     }
-    setPhotos(newPhotos);
-    await sb.setSetting("photos", newPhotos);
-    flashSave(`${files.length} photo(s) added ✓`);
+    try {
+      await sb.setSetting("photos", newPhotos);
+      setPhotos(newPhotos);
+      flashSave(`${files.length} photo(s) added ✓`);
+    } catch(e) {
+      alert("Could not save photos — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
   async function remove(i){
     const next=photos.filter((_,idx)=>idx!==i);
-    setPhotos(next); await sb.setSetting("photos",next);
-    flashSave("Photo removed ✓");
+    try {
+      await sb.setSetting("photos",next);
+      setPhotos(next);
+      flashSave("Photo removed ✓");
+    } catch(e) {
+      alert("Could not remove photo — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
   async function updateCaption(i,caption){
     const next=photos.map((p,idx)=>idx===i?{...p,caption}:p);
-    setPhotos(next); await sb.setSetting("photos",next);
+    try {
+      await sb.setSetting("photos",next);
+      setPhotos(next);
+    } catch(e) {
+      alert("Could not save caption — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
 
   return (
@@ -2135,13 +2162,23 @@ function AdminPricing({ pricing, setPricing, showPricing, setShowPricing, flashS
   const [edit,setEdit]=useState(JSON.parse(JSON.stringify(pricing)));
 
   async function save(){
-    setPricing(edit); await sb.setSetting("pricing",edit);
-    flashSave("Pricing saved ✓");
+    try {
+      await sb.setSetting("pricing",edit);
+      setPricing(edit);
+      flashSave("Pricing saved ✓");
+    } catch(e) {
+      alert("Could not save pricing — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
   async function toggleShow(){
-    const next=!showPricing; setShowPricing(next);
-    await sb.setSetting("show_pricing",next);
-    flashSave(next?"Pricing tab shown ✓":"Pricing tab hidden ✓");
+    const next=!showPricing;
+    try {
+      await sb.setSetting("show_pricing",next);
+      setShowPricing(next);
+      flashSave(next?"Pricing tab shown ✓":"Pricing tab hidden ✓");
+    } catch(e) {
+      alert("Could not save — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
 
   return (
@@ -2201,8 +2238,13 @@ function AdminPricing({ pricing, setPricing, showPricing, setShowPricing, flashS
 function AdminSettings({ info, setInfo, flashSave }) {
   const [edit,setEdit]=useState({...info});
   async function save(){
-    setInfo(edit); await sb.setSetting("info",edit);
-    flashSave("Settings saved ✓");
+    try {
+      await sb.setSetting("info",edit);
+      setInfo(edit);
+      flashSave("Settings saved ✓");
+    } catch(e) {
+      alert("Could not save — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
   return (
     <div className="slide-in">
@@ -2236,9 +2278,13 @@ function AdminAngelEdit({ tips, setTips, flashSave }) {
   }, [tips]);
 
   async function save() {
-    setTips(edit);
-    await sb.setSetting("tips", edit);
-    flashSave("Angel Edit saved ✓");
+    try {
+      await sb.setSetting("tips", edit);
+      setTips(edit);
+      flashSave("Angel Edit saved ✓");
+    } catch(e) {
+      alert("Could not save — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
 
   function addPlace() {
@@ -2575,18 +2621,26 @@ function AdminAnalytics({ requests, airbnbBookings, costs, setCosts, flashSave }
   async function addCost() {
     if (!newCost.date || !newCost.amount || !newCost.description) return;
     const next = [...(costs||[]), {...newCost, id: Date.now(), amount: Number(newCost.amount)}];
-    setCosts(next);
-    await sb.setSetting("costs", next);
-    setShowAddCost(false);
-    setNewCost({ date: new Date().toISOString().slice(0,10), description: "", amount: "", type: "cleaning" });
-    flashSave("Cost added ✓");
+    try {
+      await sb.setSetting("costs", next);
+      setCosts(next);
+      setShowAddCost(false);
+      setNewCost({ date: new Date().toISOString().slice(0,10), description: "", amount: "", type: "cleaning" });
+      flashSave("Cost added ✓");
+    } catch(e) {
+      alert("Could not save — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
 
   async function removeCost(id) {
     const next = (costs||[]).filter(c => c.id !== id);
-    setCosts(next);
-    await sb.setSetting("costs", next);
-    flashSave("Cost removed ✓");
+    try {
+      await sb.setSetting("costs", next);
+      setCosts(next);
+      flashSave("Cost removed ✓");
+    } catch(e) {
+      alert("Could not remove — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
 
   return (
@@ -2789,9 +2843,13 @@ function AdminIcalSync({ blockedDates, setBlockedDates, airbnbDates, setAirbnbDa
   }, []);
 
   async function saveUrl() {
-    await sb.setSetting("ical_url", icalUrl);
-    setSavedUrl(icalUrl);
-    flashSave("Airbnb iCal URL saved ✓");
+    try {
+      await sb.setSetting("ical_url", icalUrl);
+      setSavedUrl(icalUrl);
+      flashSave("Airbnb iCal URL saved ✓");
+    } catch(e) {
+      alert("Could not save — please check you're still logged in, then try again.\n\n"+e.message);
+    }
   }
 
   async function syncNow() {
