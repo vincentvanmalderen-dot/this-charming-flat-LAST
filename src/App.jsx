@@ -1275,7 +1275,7 @@ function GuestFieldGuides({ guides }) {
           </div>
         : all.map((g,i)=>(
           <div key={g.id||i} className="card" style={{padding:"0",marginBottom:"20px",overflow:"hidden",display:"flex",flexWrap:"wrap"}}>
-            <div style={{width:"140px",minHeight:"140px",flexShrink:0,background:g.cover?`url(${g.cover}) center/cover`:`linear-gradient(135deg,${C.secondary},${C.primary})`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div style={{width:"140px",minHeight:"180px",flexShrink:0,background:g.cover?`${C.surfaceContainerLow} url(${g.cover}) center/contain no-repeat`:`linear-gradient(135deg,${C.secondary},${C.primary})`,display:"flex",alignItems:"center",justifyContent:"center"}}>
               {!g.cover&&<Icon name="menu_book" size={40} style={{color:"white"}}/>}
             </div>
             <div style={{flex:1,minWidth:"220px",padding:"24px 28px",display:"flex",flexDirection:"column",justifyContent:"center"}}>
@@ -2474,7 +2474,7 @@ function AdminFieldGuides({ guides, setGuides, flashSave }) {
                   <Icon name="image" size={13} style={{color:C.primary,marginRight:"4px"}}/> Cover image (optional)
                 </label>
                 <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
-                  {guide.cover&&<img src={guide.cover} alt={guide.title} style={{width:"60px",height:"60px",objectFit:"cover",borderRadius:"8px",flexShrink:0}}/>}
+                  {guide.cover&&<img src={guide.cover} alt={guide.title} style={{width:"60px",height:"60px",objectFit:"contain",background:C.surfaceContainerLow,borderRadius:"8px",flexShrink:0}}/>}
                   <div style={{flex:1}}>
                     <input type="file" accept="image/*" onChange={e=>{
                       const file=e.target.files[0]; if(!file) return;
